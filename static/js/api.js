@@ -1,0 +1,560 @@
+/**
+ * TxtLlmHub — API & Data Layer
+ * Backend communication: file upload, manual input parsing,
+ * single/batch translation, and translating-state helpers.
+ * Depends on: utils.js, state.js
+ */
+
+// ── File Upload ──
+async function processFiles(files) {
+  var txtFiles = Array.from(files).filter(function (f) { return f.name.endsWith('.txt'); });
+  if (txtFiles.length === 0) { showToast('请选择 .txt 文件'); return; }
+  var form = new FormData();
+  for (var i = 0; i < txtFiles.length; i++) { form.append('file', txtFiles[i]); }
+  try {
+    var r = await fetch('/api/upload', { method: 'POST', body: form });
+    if (!r.ok) { showToast('文件解析失败'); return; }
+    var d = await r.json();
+    var hasExisting = state.lines.length > 0;
+
+    if (hasExisting) {
+      // 追加模式：已有内容，新文件追加到末尾（同名跳过）
+      var offset = state.lines.length;
+      var addedFiles = 0, addedLines = 0;
+      var newFileNames = d.files || [];
+      var skippedNames = [];
+      // 按文件分组新行
+      var linesByFile = {};
+      for (var li = 0; li < d.lines.length; li++) {
+        var lf = d.lines[li]._file || '';
+        if (!linesByFile[lf]) linesByFile[lf] = [];
+        linesByFile[lf].push(d.lines[li]);
+      }
+      for (var fi = 0; fi < newFileNames.length; fi++) {
+        var fname = newFileNames[fi];
+        if (state.fileNames.indexOf(fname) !== -1) {
+          skippedNames.push(fname);
+          continue;
+        }
+        state.fileNames.push(fname);
+        state.files.push({ name: fname, checked: true });
+        var fileLines = linesByFile[fname] || [];
+        for (var fli = 0; fli < fileLines.length; fli++) {
+          var obj = {};
+          for (var k in fileLines[fli]) { obj[k] = fileLines[fli][k]; }
+          obj.index = offset++;
+          state.lines.push(obj);
+          addedLines++;
+        }
+        addedFiles++;
+      }
+      if (skippedNames.length > 0) {
+        log('跳过重复文件：' + skippedNames.join('、'), '', true);
+      }
+      log('追加 ' + addedFiles + ' 个文件 · +' + addedLines + ' 行（共 ' + state.lines.length + ' 行）', '', true);
+    } else {
+      // 首次加载：替换全部
+      state.lines = d.lines.map(function (l, i) { var obj = {}; for (var k in l) { obj[k] = l[k]; } obj.index = i; return obj; });
+      state.fileNames = d.files || [];
+      state.files = (d.files || []).map(function (f) { return { name: f, checked: true }; });
+      state.abort = false;
+      state.translating = false;
+      state.previewChecked.clear();
+      state.previewQuery = '';
+      state.compareQuery = '';
+      $('previewSearch').value = '';
+      $('compareSearch').value = '';
+      updateSearchUI('previewSearchWrap', 'previewSearchCount', '');
+      updateSearchUI('compareSearchWrap', 'compareSearchCount', '');
+      clearLog();
+      log('加载 ' + d.files.length + ' 个文件 · ' + d.count + ' 行', '', true);
+    }
+
+    renderFileList();
+    $('btnTranslateAll').disabled = false;
+    $('btnRetryFailed').disabled = true;
+    $('btnExport').disabled = true;
+    $('btnClearAll').disabled = false;
+    renderPreview();
+    renderCompare();
+    updateManualBtn();
+    $('translateHint').style.display = 'none';
+    var toastMsg;
+    if (hasExisting) {
+      toastMsg = addedFiles > 0
+        ? '已追加 ' + addedFiles + ' 个文件 · +' + addedLines + ' 行（共 ' + state.lines.length + ' 行）'
+        : '所有文件已存在，未添加新内容';
+    } else {
+      toastMsg = '已加载 ' + d.files.length + ' 个文件 · ' + d.count + ' 行';
+    }
+    showToast(toastMsg);
+  } catch (e) {
+    showToast('上传失败: ' + e.message);
+  }
+}
+
+// ── Manual Input ──
+async function loadManualInput() {
+  var raw = $('manualInput').value.trim();
+  if (!raw) { showToast('输入内容为空'); return; }
+  try {
+    var r = await fetch('/api/manual-input', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ text: raw })
+    });
+    if (!r.ok) { showToast('解析失败'); return; }
+    var d = await r.json();
+    var hasExisting = state.lines.length > 0;
+    if (hasExisting) {
+      var offset = state.lines.length;
+      var newLines = d.lines.map(function (l, i) {
+        var obj = {};
+        for (var k in l) { obj[k] = l[k]; }
+        obj.new_translation = '';
+        obj._file = '手动录入';
+        obj.index = offset + i;
+        return obj;
+      });
+      state.lines = state.lines.concat(newLines);
+      if (state.fileNames.indexOf('手动录入') === -1) { state.fileNames.push('手动录入'); state.files.push({ name: '手动录入', checked: true }); }
+      clearLog();
+      renderFileList();
+      $('btnTranslateAll').disabled = false;
+      $('btnClearAll').disabled = false;
+      renderPreview(); renderCompare();
+      log('手动添加 ' + d.count + ' 行（共 ' + state.lines.length + ' 行）', '', true);
+      showToast('已添加 ' + d.count + ' 行（共 ' + state.lines.length + ' 行）');
+    } else {
+      state.lines = d.lines.map(function (l, i) {
+        var obj = {};
+        for (var k in l) { obj[k] = l[k]; }
+        obj._file = '手动录入';
+        obj.index = i;
+        return obj;
+      });
+      state.fileNames = ['手动录入'];
+      state.files = [{ name: '手动录入', checked: true }];
+      state.abort = false;
+      state.translating = false;
+      state.previewChecked.clear();
+      state.previewQuery = '';
+      state.compareQuery = '';
+      $('previewSearch').value = '';
+      $('compareSearch').value = '';
+      updateSearchUI('previewSearchWrap', 'previewSearchCount', '');
+      updateSearchUI('compareSearchWrap', 'compareSearchCount', '');
+      clearLog();
+      renderFileList();
+      $('btnTranslateAll').disabled = false;
+      $('btnRetryFailed').disabled = true;
+      $('btnExport').disabled = true;
+      $('btnClearAll').disabled = false;
+      renderPreview(); renderCompare();
+      $('translateHint').style.display = 'none';
+      log('手动录入 ' + d.count + ' 行', '', true);
+      showToast('已加载 ' + d.count + ' 行');
+    }
+    $('manualInput').value = '';
+    updateManualBtn();
+  } catch (e) {
+    showToast('加载失败: ' + e.message);
+  }
+}
+
+// ── Single-line Translation Core ──
+async function translateOneCore(index) {
+  var line = state.lines[index];
+  if (!line) return;
+  var mode = state.translateMode;
+  var effectiveMode = (mode === 'polish' && (!line.translation || !line.translation.trim())) ? 'direct' : mode;
+  log('[' + (line.index + 1) + '] ' + (effectiveMode === 'polish' ? '润色' : '翻译') + ' "' + line.original.substring(0, 30) + '..."');
+  try {
+    var params = getLLMParams();
+    var apiConfig = getApiConfig();
+    var url = effectiveMode === 'polish' ? '/api/translate-polish' : '/api/translate';
+    var baseObj = effectiveMode === 'polish'
+      ? { text: line.original, old_translation: line.translation || '' }
+      : { text: line.original };
+    var bodyObj = Object.assign(baseObj, params, apiConfig);
+    var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyObj) });
+    var d = await r.json();
+    if (r.ok) {
+      line.new_translation = d.translation;
+      line.error = '';
+      line.truncated = !!d.truncated;
+      line.warning = d.warning || '';
+      var extra = line.truncated ? ' ⚠️截断' : (line.warning ? ' ⚠️' : '');
+      log('[' + (line.index + 1) + '] → ' + d.translation.substring(0, 40) + extra, 'ok');
+    } else {
+      line.error = d.error || '未知错误';
+      log('[' + (line.index + 1) + '] 错误: ' + line.error, 'err');
+    }
+  } catch (e) {
+    line.error = e.message;
+    log('[' + (line.index + 1) + '] 错误: ' + e.message, 'err');
+  }
+}
+
+// ── Translation State Helpers ──
+function enterTranslatingState() {
+  state.translating = true;
+  state.abort = false;
+  $('btnTranslateAll').disabled = true;
+  $('btnStop').disabled = false;
+  updatePreviewSelectAllVisibility();
+  updateSelectAllPreview();
+}
+
+function exitTranslatingState() {
+  state.translating = false;
+  state.abort = false;
+  updateTranslateAllButton();
+  $('btnClearAll').disabled = (state.lines.length === 0);
+  $('btnStop').disabled = true;
+  $('btnStop').textContent = '停止';
+  updateRetryButton();
+  updatePreviewSelectAllVisibility();
+  renderPreview();
+  renderCompare();
+}
+
+// ── Batch Translation Engine ──
+var CHUNK_SIZE = 10;
+
+async function translateBatchItems(items) {
+  var total = items.length;
+  var concurrency = parseInt($('concurrency').value) || 5;
+  CHUNK_SIZE = concurrency;
+  var params = getLLMParams();
+  var apiConfig = getApiConfig();
+  var mode = state.translateMode;
+  var apiUrl = mode === 'polish' ? '/api/translate-batch-polish' : '/api/translate-batch';
+
+  var done = 0, errors = 0;
+  for (var start = 0; start < total; start += CHUNK_SIZE) {
+    if (state.abort) {
+      $('progressText').textContent = '已停止 · ' + done + '/' + total;
+      log('翻译已停止，已完成 ' + done + ' 行');
+      break;
+    }
+    var chunk = items.slice(start, start + CHUNK_SIZE);
+    var chunkEnd = Math.min(start + CHUNK_SIZE, total);
+    $('progressText').textContent = '进度: ' + done + '/' + total + ' · 并发' + concurrency;
+    log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 第' + (start + 1) + '-' + chunkEnd + '行...');
+    try {
+      var batchBody = Object.assign({ items: chunk, concurrency: concurrency }, params, apiConfig);
+      var r = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batchBody)
+      });
+      if (!r.ok) {
+        var errText = '';
+        try { var ed = await r.json(); errText = ed.error || ''; } catch (ex) { errText = r.statusText; }
+        for (var ci = 0; ci < chunk.length; ci++) {
+          chunk[ci].error = errText || '翻译失败';
+          chunk[ci].new_translation = '';
+        }
+        errors += chunk.length;
+        log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 失败 - ' + (errText || '请求错误'), 'err');
+      } else {
+        // 流式读取 NDJSON
+        var reader = r.body.getReader();
+        var decoder = new TextDecoder();
+        var buf = '';
+        var okIn = 0, errIn = 0;
+        while (true) {
+          var streamResult = await reader.read();
+          if (streamResult.done) break;
+          buf += decoder.decode(streamResult.value, { stream: true });
+          var lines = buf.split('\n');
+          buf = lines.pop();
+          for (var li = 0; li < lines.length; li++) {
+            var line = lines[li].trim();
+            if (!line) continue;
+            try {
+              var res = JSON.parse(line);
+              var pos = res.index;
+              if (pos >= 0 && pos < chunk.length) {
+                chunk[pos].new_translation = res.new_translation;
+                chunk[pos].error = res.error || '';
+                chunk[pos].truncated = !!res.truncated;
+                chunk[pos].warning = res.warning || '';
+                if (res.error) errIn++; else okIn++;
+              }
+            } catch (parseErr) {
+              // skip malformed lines
+            }
+          }
+        }
+        // 处理 buffer 中残留的最后一行
+        if (buf.trim()) {
+          try {
+            var lastRes = JSON.parse(buf.trim());
+            var lastPos = lastRes.index;
+            if (lastPos >= 0 && lastPos < chunk.length) {
+              chunk[lastPos].new_translation = lastRes.new_translation;
+              chunk[lastPos].error = lastRes.error || '';
+              chunk[lastPos].truncated = !!lastRes.truncated;
+              chunk[lastPos].warning = lastRes.warning || '';
+              if (lastRes.error) errIn++; else okIn++;
+            }
+          } catch (parseErr2) {}
+        }
+        log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 完成' + okIn + '行' + (errIn ? ',失败' + errIn + '行' : ''), 'ok');
+        renderCompare();
+      }
+    } catch (e) {
+      for (var ci2 = 0; ci2 < chunk.length; ci2++) { chunk[ci2].error = e.message; }
+      errors += chunk.length;
+      log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 异常 - ' + e.message, 'err');
+      renderCompare();
+    }
+    done = chunkEnd;
+    $('progressFill').style.width = (done / total * 100) + '%';
+    var successCount = done - errors;
+    $('progressText').textContent = '进度: ' + done + '/' + total + ' (成功' + successCount + ', 失败' + errors + ')';
+    renderPreview();
+    // renderCompare 已在每块完成后刷新
+    if (state.abort) break;
+  }
+  return { done: done, errors: errors, wasAborted: state.abort };
+}
+
+
+// ── File List Management ──
+function renderFileList() {
+  var html = '';
+  for (var i = 0; i < state.files.length; i++) {
+    var f = state.files[i];
+    var lineCount = state.lines.filter(function (l) { return l._file === f.name; }).length;
+    html += '<div class="file-entry" draggable="true" data-file-index="' + i + '" ondragstart="onFileDragStart(event)" ondragover="onFileDragOver(event)" ondrop="onFileDrop(event)" ondragend="onFileDragEnd(event)">' +
+      '<input type="checkbox" class="file-check" ' + (f.checked ? 'checked' : '') + ' onchange="toggleFile(' + i + ')" title="勾选后该文件内容会出现在预览和翻译中">' +
+      '<span class="file-name">' + escHtml(f.name) + '</span>' +
+      '<span class="file-count">' + lineCount + ' 行</span>' +
+      '<span class="file-drag-handle" title="拖动排序">≡</span>' +
+      '<span class="file-delete" onclick="deleteFile(' + i + '); event.stopPropagation()" title="删除此文件">🗑</span>' +
+    '</div>';
+  }
+  $('fileInfo').innerHTML = html || '<div class="empty-state">暂无来源文件</div>';
+}
+
+function deleteFile(index) {
+  var f = state.files[index];
+  if (!f) return;
+  var fname = f.name;
+  // Remove lines belonging to this file
+  var indices = [];
+  for (var i = state.lines.length - 1; i >= 0; i--) {
+    if (state.lines[i]._file === fname) indices.push(i);
+  }
+  for (var di = 0; di < indices.length; di++) {
+    state.previewChecked.delete(indices[di]);
+    state.compareChecked.delete(indices[di]);
+    state.lines.splice(indices[di], 1);
+  }
+  // Re-index and rebuild checked sets
+  rebuildIndicesAndCheckboxes();
+  // Remove file entry
+  state.files.splice(index, 1);
+  state.fileNames = state.files.map(function (x) { return x.name; });
+  // Clear search queries
+  state.previewQuery = '';
+  state.compareQuery = '';
+  $('previewSearch').value = '';
+  $('compareSearch').value = '';
+  updateSearchUI('previewSearchWrap', 'previewSearchCount', '');
+  updateSearchUI('compareSearchWrap', 'compareSearchCount', '');
+  // If no files left, clear everything
+  if (state.files.length === 0) {
+    state.lines = [];
+    state.fileNames = [];
+  }
+  renderFileList();
+  renderPreview();
+  renderCompare();
+  updateRetryButton();
+  $('btnExport').disabled = !state.lines.some(function (l) { return l.new_translation; });
+  if (state.lines.length === 0) {
+    $('btnTranslateAll').disabled = true;
+    $('btnClearAll').disabled = true;
+    $('translateHint').style.display = 'block';
+  }
+  // Clear manual input textarea if deleting manual entry
+  if (fname === '手动录入') {
+    $('manualInput').value = '';
+  }
+  log('已删除文件: ' + fname);
+}
+
+function toggleFile(index) {
+  var f = state.files[index];
+  if (!f) return;
+  f.checked = !f.checked;
+  var checkedNames = state.files.filter(function (x) { return x.checked; }).map(function (x) { return x.name; });
+  var visible = state.lines.some(function (l) { return l._file && checkedNames.indexOf(l._file) >= 0; });
+  renderFileList();
+  $('btnTranslateAll').disabled = !visible;
+  renderPreview();
+  renderCompare();
+}
+
+// ── File Drag Reorder ──
+var _dragSrcIndex = -1;
+
+function onFileDragStart(e) {
+  _dragSrcIndex = parseInt(e.target.closest('.file-entry').dataset.fileIndex);
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.closest('.file-entry').classList.add('dragging');
+}
+
+function onFileDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  var entry = e.target.closest('.file-entry');
+  if (entry) entry.classList.add('drag-over');
+}
+
+function onFileDragEnd(e) {
+  var entries = document.querySelectorAll('.file-entry');
+  for (var i = 0; i < entries.length; i++) {
+    entries[i].classList.remove('dragging', 'drag-over');
+  }
+}
+
+function onFileDrop(e) {
+  e.preventDefault();
+  var entry = e.target.closest('.file-entry');
+  if (!entry) return;
+  entry.classList.remove('drag-over');
+  var dstIndex = parseInt(entry.dataset.fileIndex);
+  if (_dragSrcIndex < 0 || _dragSrcIndex === dstIndex) return;
+
+  // Snapshot checked lines by object reference (not index, which will change)
+  var checkedPCLines = new Set();
+  var checkedCCLines = new Set();
+  state.lines.forEach(function (l) {
+    if (state.previewChecked.has(l.index)) checkedPCLines.add(l);
+    if (state.compareChecked.has(l.index)) checkedCCLines.add(l);
+  });
+
+  // Reorder state.files
+  var item = state.files.splice(_dragSrcIndex, 1)[0];
+  state.files.splice(dstIndex, 0, item);
+
+  // Reorder state.lines to match new file order
+  var newLines = [];
+  for (var fi = 0; fi < state.files.length; fi++) {
+    var fname = state.files[fi].name;
+    for (var li = 0; li < state.lines.length; li++) {
+      if (state.lines[li]._file === fname) newLines.push(state.lines[li]);
+    }
+  }
+  // Add lines without _file at the end
+  for (var li2 = 0; li2 < state.lines.length; li2++) {
+    if (!state.lines[li2]._file) newLines.push(state.lines[li2]);
+  }
+  state.lines = newLines;
+
+  // Re-index
+  for (var ri = 0; ri < state.lines.length; ri++) { state.lines[ri].index = ri; }
+
+  // Rebuild checked sets from snapshots (uses object identity, survives reorder)
+  state.previewChecked.clear();
+  state.compareChecked.clear();
+  state.lines.forEach(function (l) {
+    if (checkedPCLines.has(l)) state.previewChecked.add(l.index);
+    if (checkedCCLines.has(l)) state.compareChecked.add(l.index);
+  });
+
+  renderFileList();
+  renderPreview();
+  renderCompare();
+  log('已调整文件顺序');
+}
+
+// ── Reset Source Input ──
+function resetSourceInput() {
+  if (state.lines.length === 0) { showToast('来源输入已为空'); return; }
+  state.lines = [];
+  state.fileNames = [];
+  state.files = [];
+  state.previewChecked.clear();
+  state.compareChecked.clear();
+  state.previewQuery = '';
+  state.compareQuery = '';
+  $('previewSearch').value = '';
+  $('compareSearch').value = '';
+  updateSearchUI('previewSearchWrap', 'previewSearchCount', '');
+  updateSearchUI('compareSearchWrap', 'compareSearchCount', '');
+  renderFileList();
+  renderPreview();
+  renderCompare();
+  $('btnTranslateAll').disabled = true;
+  $('btnRetryFailed').disabled = true;
+  $('btnClearAll').disabled = true;
+  $('btnExport').disabled = true;
+  $('translateHint').style.display = 'block';
+  clearLog();
+  log('来源输入已重置');
+  showToast('来源输入已重置');
+}
+
+// ── Preview Delete ──
+function deleteCheckedPreview() {
+  var indices = [];
+  state.lines.forEach(function (l) {
+    if (state.previewChecked.has(l.index)) indices.push(l.index);
+  });
+  if (indices.length === 0) { showToast('请先勾选预览条目'); return; }
+  indices.sort(function (a, b) { return b - a; });
+  for (var i = 0; i < indices.length; i++) {
+    state.lines.splice(indices[i], 1);
+    state.previewChecked.delete(indices[i]);
+    state.compareChecked.delete(indices[i]);
+  }
+  // Re-index and rebuild checked sets
+  rebuildIndicesAndCheckboxes();
+  // Remove empty file entries
+  state.files = state.files.filter(function (f) {
+    return state.lines.some(function (l) { return l._file === f.name; });
+  });
+  state.fileNames = state.files.map(function (f) { return f.name; });
+  renderFileList();
+  renderPreview();
+  renderCompare();
+  updateRetryButton();
+  if (state.lines.length === 0) {
+    $('btnTranslateAll').disabled = true;
+    $('btnClearAll').disabled = true;
+    $('translateHint').style.display = 'block';
+  }
+  log('删除 ' + indices.length + ' 条预览条目');
+  showToast('已删除 ' + indices.length + ' 条');
+}
+
+function deletePreviewLine(index, e) {
+  if (e) e.stopPropagation();
+  var line = state.lines[index];
+  if (!line) return;
+  state.lines.splice(index, 1);
+  state.previewChecked.delete(index);
+  state.compareChecked.delete(index);
+  rebuildIndicesAndCheckboxes();
+  // Remove file entry if no lines remain
+  if (line._file && !state.lines.some(function (l) { return l._file === line._file; })) {
+    state.files = state.files.filter(function (f) { return f.name !== line._file; });
+    state.fileNames = state.files.map(function (f) { return f.name; });
+  }
+  renderFileList();
+  renderPreview();
+  renderCompare();
+  updateRetryButton();
+  if (state.lines.length === 0) {
+    $('btnTranslateAll').disabled = true;
+    $('btnClearAll').disabled = true;
+    $('translateHint').style.display = 'block';
+  }
+  log('[' + (index + 1) + '] 已删除');
+}
