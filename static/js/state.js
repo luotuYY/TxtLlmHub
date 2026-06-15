@@ -511,7 +511,7 @@ function updateExportCheckedButton() {
   var saved = localStorage.getItem('tllmh_mode');
   if (saved === 'polish') setMode('polish');
 })();
-setTimeout(function () { loadDefaults(); initPreviewRowLimit(); }, 0);
+setTimeout(function () { loadDefaults(); }, 0);
 
 // ── Connectivity check on startup + periodic polling ──
 checkLLM();

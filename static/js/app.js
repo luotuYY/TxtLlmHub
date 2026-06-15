@@ -100,6 +100,7 @@ async function translateAll() {
   $('btnRetryFailed').disabled = true;
   $('btnStop').disabled = false;
   $('btnExport').disabled = true;
+  _startRuntime();
   var mode = state.translateMode;
   var isResume = state._resumeMode;
   state._resumeMode = false;
@@ -149,6 +150,7 @@ async function retryFailed() {
   $('btnRetryFailed').disabled = true;
   $('btnStop').disabled = false;
   $('btnExport').disabled = true;
+  _startRuntime();
   clearLog();
   log('重试失败行，共' + failed.length + '行，并发' + (parseInt($('concurrency').value) || 3));
   var result = await translateBatchItems(failed);
@@ -177,6 +179,7 @@ async function retrySelected() {
   $('btnRetryFailed').disabled = true;
   $('btnStop').disabled = false;
   $('btnExport').disabled = true;
+  _startRuntime();
   if (!wasTranslating) clearLog();
   log('重译选中条目，共' + checked.length + '行，并发' + (parseInt($('concurrency').value) || 5));
   var result = await translateBatchItems(checked);
@@ -631,4 +634,7 @@ function triggerDownload(filename, fcontent) {
     var files = fileInput.files;
     if (files && files.length > 0) processFiles(files);
   });
+
+  // Deferred init (all modules loaded)
+  setTimeout(function () { initPreviewRowLimit(); }, 0);
 })();

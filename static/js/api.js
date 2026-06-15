@@ -197,6 +197,30 @@ async function translateOneCore(index) {
 }
 
 // ── Translation State Helpers ──
+// ── Task Runtime Timer ──
+var _taskStartTime = 0;
+var _runtimeTimer = 0;
+
+function _startRuntime() {
+  _taskStartTime = Date.now();
+  var rd = $('runtimeDisplay');
+  rd.textContent = '00:00';
+  rd.style.display = 'inline';
+  _runtimeTimer = setInterval(function () {
+    var elapsed = Math.floor((Date.now() - _taskStartTime) / 1000);
+    var m = Math.floor(elapsed / 60);
+    var s = elapsed % 60;
+    rd.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }, 500);
+}
+
+function _stopRuntime() {
+  clearInterval(_runtimeTimer);
+  _runtimeTimer = 0;
+  _taskStartTime = 0;
+  $('runtimeDisplay').style.display = 'none';
+}
+
 function enterTranslatingState() {
   state.translating = true;
   state.abort = false;
@@ -204,11 +228,13 @@ function enterTranslatingState() {
   $('btnStop').disabled = false;
   updatePreviewSelectAllVisibility();
   updateSelectAllPreview();
+  _startRuntime();
 }
 
 function exitTranslatingState() {
   state.translating = false;
   state.abort = false;
+  _stopRuntime();
   updateTranslateAllButton();
   $('btnClearAll').disabled = (state.lines.length === 0);
   $('btnStop').disabled = true;
