@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TxtLlmHub — 分词</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/tag.css">
+</head>
+<body>
+
+<div id="bg-image"></div>
+<div id="bg-overlay"></div>
+<div id="xuna"></div>
+
+<!-- 顶部工具栏 -->
+<div class="toolbar" style="position:relative">
+  <div class="toolbar-left">
+    <h1>TxtLlmHub</h1>
+    <a href="/" class="nav-link">翻译</a>
+    <span id="llmStatus">
+      <span class="dot dot-err"></span>
+      <span class="status-text">LLM 未连接</span>
+    </span>
+    <span class="segmented-toggle" style="margin-left:10px">
+      <button class="btn btn-sm segmented-btn active" id="btnLocal" onclick="setProvider('local')">本地LLM</button>
+      <button class="btn btn-sm segmented-btn" id="btnCommercial" onclick="setProvider('commercial')">商业API</button>
+    </span>
+  </div>
+  <div class="tag-collapse-bar" id="tagCollapseBar" onclick="tagToggleCollapse()" title="收起/展开输入和预览">
+    <span id="tagCollapseIcon">▲</span>
+    <span class="collapse-title">输入/预览</span>
+  </div>
+</div>
+
+<!-- 分词页面 -->
+<div class="tag-page" style="display:block">
+  <!-- 上排：来源 + 预览 -->
+  <div class="tag-top-row" id="tagTopRow">
+    <div class="tag-top-content">
+      <div class="card" id="tagInputCard">
+        <div class="card-header">📂 来源输入</div>
+        <div class="card-body">
+          <div class="manual-input" style="display:flex;align-items:stretch;gap:6px;margin-bottom:8px">
+            <textarea id="tagManualInput" placeholder="手动输入，每行一条：原文=译文" style="flex:1"></textarea>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <button class="btn btn-primary btn-sm" onclick="tagLoadManualInput()" style="flex:1">添加</button>
+              <button class="btn btn-sm" onclick="tagClearAll()" style="flex:1">重置</button>
+            </div>
+          </div>
+          <div class="drop-zone" id="tagDropZone">
+            <div class="dz-icon">📨</div>
+            <div class="dz-text">拖拽 txt 文件到此处，或点击选择</div>
+            <div class="dz-hint">格式：原文=译文（每行一条）</div>
+            <input type="file" id="tagFileInput" accept=".txt" multiple>
+          </div>
+          <div class="file-info" id="tagFileInfo"></div>
+        </div>
+      </div>
+      <div class="card" id="tagPreviewCard">
+        <div class="card-header">
+          <div class="header-left">📋 源文本预览</div>
+          <div class="search-wrap">
+            <select id="tagPreviewRowLimit" onchange="tagOnRowLimitChange()" style="font-size:0.72rem;padding:1px 4px;background:var(--bg);color:var(--text);border:1px solid rgba(255,255,255,0.12);border-radius:4px;margin-right:4px">
+              <option value="2000">2000</option>
+              <option value="5000">5000</option>
+              <option value="-1">全部</option>
+              <option value="-2">自定</option>
+            </select>
+            <input id="tagPreviewCustomLimit" type="number" min="1" placeholder="行数" onchange="tagOnCustomLimitChange()" class="preview-limit-input" style="display:none;width:56px;font-size:0.72rem;padding:1px 4px;background:var(--bg);color:var(--text);border:1px solid rgba(255,255,255,0.12);border-radius:4px;margin-right:4px">
+            <span class="search-count" id="tagPreviewCount">0 行</span>
+            <input class="search-input" id="tagSearch" placeholder="搜索..." oninput="tagOnSearch()">
+            <span class="search-clear" onclick="tagClearSearch()">×</span>
+          </div>
+        </div>
+        <div class="card-body" id="tagPreview">
+          <div class="empty-state">请先上传 txt 文件或手动输入</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 控制栏 -->
+  <div class="card tag-controls-row">
+    <div class="card-header">🏷️ 分词控制</div>
+    <div class="card-body">
+      <div class="api-config" style="margin-bottom:12px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="tagToggleApiConfig()">
+          <span style="font-size:0.8rem">⚙️ API 配置</span>
+          <span id="tagApiConfigArrow">▼</span>
+        </div>
+        <div id="tagApiConfigPanel" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+            <input type="text" id="tagApiBase" placeholder="API Base URL" style="flex:2;min-width:180px" class="param-input" oninput="tagSaveApiConfig()">
+            <input type="password" id="tagApiKey" placeholder="API Key" style="flex:2;min-width:180px" class="param-input" oninput="tagSaveApiConfig()">
+            <input type="text" id="tagModelName" placeholder="Model Name" style="flex:1;min-width:120px" class="param-input" oninput="tagSaveApiConfig()">
+            <button class="btn btn-sm" onclick="tagTestConnection()">测试连接</button>
+          </div>
+          <div style="font-size:0.7rem;color:var(--text-muted)">
+            <span>示例（DeepSeek）：</span><code>https://api.deepseek.com/v1/chat/completions</code> | Key | <code>deepseek-chat</code>
+          </div>
+        </div>
+      </div>
+      <div class="tag-controls">
+        <button class="btn btn-primary" id="tagBtnStart" disabled onclick="tagStart()">开始分词</button>
+        <button class="btn" id="tagBtnStop" disabled onclick="tagStop()">停止</button>
+        <button class="btn" id="tagBtnClear" disabled onclick="tagClearAll()">清除全部</button>
+        <button class="btn" id="tagBtnExport" disabled onclick="tagExport()">导出结果</button>
+        <button class="btn" id="tagBtnExportSep" onclick="tagExportSeparate()">按类目分别导出</button>
+        <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px">并发</span>
+        <input type="number" id="tagConcurrency" value="3" min="1" max="10" class="param-input" style="width:42px">
+        <span id="tagRuntimeDisplay" style="display:none;font-size:0.72rem;color:var(--accent);margin-left:6px;font-variant-numeric:tabular-nums"></span>
+      </div>
+      <div class="tag-progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="tagProgressFill"></div></div>
+        <div class="progress-text" id="tagProgressText">等待开始</div>
+      </div>
+      <div class="log-area" id="tagLogArea"></div>
+    </div>
+  </div>
+
+  <!-- 分类结果 -->
+  <div class="card tag-bottom-row">
+    <div class="card-header">
+      <div class="header-left">📊 分类结果 <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted);margin-left:4px">（卡片可拖拽排序或跨栏移动）</span></div>
+    </div>
+    <div class="card-body" id="tagResultBody">
+      <div class="tag-columns-container" id="tagColumns"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/particles.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/tag.js"></script>
+
+</body>
+</html>

@@ -329,6 +329,10 @@ def _no_cache(response):
 def index():
     return send_from_directory("static", "index.html")
 
+@app.route("/tag")
+def tag_page():
+    return send_from_directory("static", "tag.html")
+
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
@@ -398,6 +402,55 @@ def translate_polish():
     if result.get("error") and not result.get("translation"):
         return jsonify(result), 503
     return jsonify(result)
+
+@app.route("/api/tag", methods=["POST"])
+def tag_text():
+    """分词/分类单条文本：用自定义 system_prompt 调用 LLM，不追加翻译隐式规则"""
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "文本为空"}), 400
+    api_config = _extract_api_config(data)
+    overrides = _extract_overrides(data)
+    # 分词任务不追加 _HIDDEN_RULES，使用纯分类提示词
+    params = {**DEFAULT_PARAMS, **overrides}
+    base_url = api_config.get("api_base") or LLM_API_URL
+    model = api_config.get("model") or LLM_MODEL
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": params["system_prompt"]},
+            {"role": "user", "content": text},
+        ],
+        "temperature": params.get("temperature", 0.1),
+        "top_p": params.get("top_p", 0.6),
+        "max_tokens": params.get("max_tokens", 100),
+        "repetition_penalty": params.get("repetition_penalty", 1.05),
+        "stream": False,
+    }
+    enable_thinking = api_config.get("enable_thinking")
+    if enable_thinking is False:
+        payload["thinking"] = {"type": "disabled"}
+    try:
+        resp = _get_session().post(
+            base_url, json=payload, timeout=LLM_TIMEOUT,
+            headers=_build_api_headers(api_config),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("choices") or not data["choices"][0].get("message"):
+            return jsonify({"translation": "", "error": "LLM 响应缺少 choices 或 message 字段"})
+        content = data["choices"][0]["message"]["content"].strip()
+        result = {"translation": content}
+        if data["choices"][0].get("finish_reason") == "length":
+            result["truncated"] = True
+        return jsonify(result)
+    except requests.exceptions.ConnectionError:
+        return jsonify({"translation": "", "error": "LLM 服务未启动或无法连接"}), 503
+    except requests.exceptions.Timeout:
+        return jsonify({"translation": "", "error": "LLM 请求超时"}), 503
+    except Exception as e:
+        return jsonify({"translation": "", "error": str(e)}), 503
 
 def _stream_batch_response(valid_items, empty_indices, concurrency, submit_fn):
     """通用批量翻译流式响应

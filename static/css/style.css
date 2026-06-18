@@ -191,6 +191,21 @@ body {
 .btn-sm { padding: 3px 9px; font-size: 0.72rem; }
 #previewSearchWrap .btn-sm { width: 30px; height: 26px; justify-content: center; box-sizing: border-box; }
 
+/* ===== 导航链接 ===== */
+.nav-link {
+  display: inline-block;
+  padding: 6px 18px;
+  margin-left: 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: all 0.2s;
+  background: rgba(255,255,255,0.06);
+}
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,0.12); }
+
 /* ===== 主网格 ===== */
 .main-grid {
   display: grid;
@@ -203,6 +218,7 @@ body {
   position: relative;
   z-index: 5;
 }
+
 
 /* ===== 玻璃卡片 ===== */
 .card {
@@ -686,7 +702,7 @@ mark { background: var(--hl); color: #e0e4ff; padding: 0 2px; border-radius: 2px
 /* ===== 粒子动画CSS ===== */
 .confetti {
   position: absolute;
-  z-index: 999;
+  z-index: 3;
 }
 .confetti .rotate {
   width: 100%;

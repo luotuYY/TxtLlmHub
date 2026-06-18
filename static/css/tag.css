@@ -1,0 +1,205 @@
+/* ── 分词页面样式 ── */
+
+/* 收起按钮 - 整个工具栏绝对居中 */
+.tag-collapse-bar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  background: rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 4px 12px;
+  transition: all 0.2s;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 11;
+}
+.tag-collapse-bar:hover {
+  background: rgba(255,255,255,0.12);
+  color: var(--text);
+}
+.tag-collapse-bar .collapse-title {
+  font-size: 0.68rem;
+}
+
+/* 页面容器 */
+.tag-page {
+  position: relative;
+  z-index: 5;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+  padding: 6px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 上排 */
+.tag-top-row {
+  flex-shrink: 0;
+  height: 35vh;
+  min-height: 0;
+  transition: height 0.25s ease, margin 0.25s ease, padding 0.25s ease;
+  overflow: hidden;
+}
+.tag-top-row.collapsed {
+  height: 0 !important;
+  min-height: 0;
+  overflow: hidden;
+}
+.tag-top-row.collapsed .tag-top-content { display: none; }
+
+/* 上排内容 */
+.tag-top-content {
+  display: flex;
+  gap: 6px;
+  height: 100%;
+}
+.tag-top-content > .card {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tag-top-content > .card > .card-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 控制栏 */
+.tag-controls-row { flex-shrink: 0; }
+.tag-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.tag-controls .btn { font-size: 0.78rem; }
+
+/* 分类结果 */
+.tag-bottom-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tag-bottom-row > .card-header { flex-shrink: 0; }
+.tag-bottom-row > .card-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 标签列容器 */
+.tag-columns-container {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 100%;
+  padding: 4px;
+}
+
+/* 单个标签列 */
+.tag-column {
+  flex: 0 0 240px;
+  min-width: 220px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+}
+.tag-column-untagged { flex: 0 0 280px; min-width: 260px; }
+
+/* 列头 */
+.tag-column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.82rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.tag-col-icon { font-size: 1.1rem; }
+.tag-col-title { flex: 1; }
+.tag-col-count {
+  background: rgba(255,255,255,0.08);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* 列体 */
+.tag-column-body {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+.tag-column-body.drag-over-col {
+  background: rgba(79,195,247,0.08);
+  border: 1px dashed rgba(79,195,247,0.3);
+  border-radius: 8px;
+}
+.tag-column-empty {
+  text-align: center;
+  padding: 20px 12px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+/* 标签卡片 */
+.tag-card {
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: grab;
+  transition: all 0.2s;
+  position: relative;
+}
+.tag-card:hover {
+  background: rgba(255,255,255,0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.tag-card.dragging { opacity: 0.4; cursor: grabbing; }
+.tag-card-num { font-size: 0.65rem; color: var(--text-muted); margin-bottom: 3px; }
+.tag-card-orig { font-size: 0.78rem; color: var(--text); line-height: 1.4; word-break: break-all; }
+.tag-card-tran { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; word-break: break-all; }
+.tag-card-tag { margin-top: 4px; font-size: 0.7rem; color: var(--text-muted); }
+.tag-confidence { font-size: 0.65rem; color: var(--accent); opacity: 0.8; }
+.tag-card-actions { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity 0.2s; }
+.tag-card:hover .tag-card-actions { opacity: 1; }
+
+/* 标签徽章 */
+.tag-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.65rem; color: #fff; margin-left: 6px; vertical-align: middle; }
+
+/* 编辑下拉 */
+.tag-edit-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.tag-edit-option { padding: 6px 10px; font-size: 0.78rem; cursor: pointer; transition: background 0.15s; }
+.tag-edit-option:hover { background: rgba(79,195,247,0.15); }
+
+/* 进度条 */
+.tag-progress-wrap { margin: 8px 0; }
+
+/* 响应式 */
+@media (max-width: 900px) {
+  .tag-top-content { flex-direction: column; }
+  .tag-columns-container { flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+  .tag-column { max-width: none; min-width: auto; flex: none; }
+}
