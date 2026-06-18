@@ -4,9 +4,10 @@ const container = document.getElementById("xuna");
 const colors = [
 "#f2abe7",
 "#9fa3ec",
-"#86d2e1 ",
-"#fec31e "];
+"#86d2e1",
+"#fec31e"];
 
+var _confettiRunning = true;
 
 class Confetti {
   constructor() {
@@ -17,18 +18,16 @@ class Confetti {
     this.c = colors[Math.floor(Math.random() * colors.length)];
   }
   create() {
-    var newConfetti = '<div class="confetti" style="bottom:' + this.y + '%; left:' + this.x + '%;width:' +
+    return '<div class="confetti" style="bottom:' + this.y + '%; left:' + this.x + '%;width:' +
     this.w + 'px; height:' + this.h + 'px;"><div class="rotate"><div class="askew" style="background-color:' + this.c + '"></div></div></div>';
-    confettiHTML += newConfetti;
-  }}
-;
-
-var confettiHTML = '';
+  }
+}
 
 function animateConfetti() {
+  var confettiHTML = '';
   for (var i = 1; i <= numConfettis; i++) {
     var confetti = new Confetti();
-    confetti.create();
+    confettiHTML += confetti.create();
   }
   container.innerHTML += confettiHTML;
   var confettis = document.querySelectorAll('.confetti');
@@ -45,4 +44,16 @@ function animateConfetti() {
     confettiShower.push(animated);
   }
 }
+
+// 页面不可见时暂停粒子动画，节省性能
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) {
+    confettiShower.forEach(function (a) { try { a.pause(); } catch (e) {} });
+    _confettiRunning = false;
+  } else {
+    confettiShower.forEach(function (a) { try { a.play(); } catch (e) {} });
+    _confettiRunning = true;
+  }
+});
+
 animateConfetti();

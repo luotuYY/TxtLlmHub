@@ -246,28 +246,27 @@ function exitTranslatingState() {
 }
 
 // ── Batch Translation Engine ──
-var CHUNK_SIZE = 10;
 
 async function translateBatchItems(items) {
   var total = items.length;
   var concurrency = parseInt($('concurrency').value) || 5;
-  CHUNK_SIZE = concurrency;
   var params = getLLMParams();
   var apiConfig = getApiConfig();
   var mode = state.translateMode;
   var apiUrl = mode === 'polish' ? '/api/translate-batch-polish' : '/api/translate-batch';
 
+  setBatchUpdating(true);
   var done = 0, errors = 0;
-  for (var start = 0; start < total; start += CHUNK_SIZE) {
+  for (var start = 0; start < total; start += concurrency) {
     if (state.abort) {
       $('progressText').textContent = '已停止 · ' + done + '/' + total;
       log('翻译已停止，已完成 ' + done + ' 行');
       break;
     }
-    var chunk = items.slice(start, start + CHUNK_SIZE);
-    var chunkEnd = Math.min(start + CHUNK_SIZE, total);
+    var chunk = items.slice(start, start + concurrency);
+    var chunkEnd = Math.min(start + concurrency, total);
     $('progressText').textContent = '进度: ' + done + '/' + total + ' · 并发' + concurrency;
-    log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 第' + (start + 1) + '-' + chunkEnd + '行...');
+    log('块' + (Math.floor(start / concurrency) + 1) + ': 第' + (start + 1) + '-' + chunkEnd + '行...');
     try {
       var batchBody = Object.assign({ items: chunk, concurrency: concurrency }, params, apiConfig);
       var r = await fetch(apiUrl, {
@@ -283,7 +282,7 @@ async function translateBatchItems(items) {
           chunk[ci].new_translation = '';
         }
         errors += chunk.length;
-        log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 失败 - ' + (errText || '请求错误'), 'err');
+        log('块' + (Math.floor(start / concurrency) + 1) + ': 失败 - ' + (errText || '请求错误'), 'err');
       } else {
         // 流式读取 NDJSON
         var reader = r.body.getReader();
@@ -308,6 +307,8 @@ async function translateBatchItems(items) {
                 chunk[pos].truncated = !!res.truncated;
                 chunk[pos].warning = res.warning || '';
                 if (res.error) errIn++; else okIn++;
+                // 增量更新该行（避免全量重建 DOM）
+                updateCompareRow(chunk[pos].index);
               }
             } catch (parseErr) {
               // skip malformed lines
@@ -325,16 +326,17 @@ async function translateBatchItems(items) {
               chunk[lastPos].truncated = !!lastRes.truncated;
               chunk[lastPos].warning = lastRes.warning || '';
               if (lastRes.error) errIn++; else okIn++;
+              updateCompareRow(chunk[lastPos].index);
             }
           } catch (parseErr2) {}
         }
-        log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 完成' + okIn + '行' + (errIn ? ',失败' + errIn + '行' : ''), 'ok');
-        renderCompare();
+        log('块' + (Math.floor(start / concurrency) + 1) + ': 完成' + okIn + '行' + (errIn ? ',失败' + errIn + '行' : ''), 'ok');
+        // 增量更新已在流式读取中逐条完成，此处无需 renderCompare
       }
     } catch (e) {
       for (var ci2 = 0; ci2 < chunk.length; ci2++) { chunk[ci2].error = e.message; }
       errors += chunk.length;
-      log('块' + (Math.floor(start / CHUNK_SIZE) + 1) + ': 异常 - ' + e.message, 'err');
+      log('块' + (Math.floor(start / concurrency) + 1) + ': 异常 - ' + e.message, 'err');
       renderCompare();
     }
     done = chunkEnd;
@@ -345,6 +347,9 @@ async function translateBatchItems(items) {
     // renderCompare 已在每块完成后刷新
     if (state.abort) break;
   }
+  setBatchUpdating(false);
+  // 最终全量同步一次（确保搜索/排序等状态一致）
+  renderCompare();
   return { done: done, errors: errors, wasAborted: state.abort };
 }
 

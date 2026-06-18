@@ -24,6 +24,15 @@ def _get_session():
     if not hasattr(_thread_local, "session"):
         _thread_local.session = requests.Session()
     return _thread_local.session
+
+
+def _close_session():
+    """Close thread-local session if exists."""
+    if hasattr(_thread_local, "session"):
+        _thread_local.session.close()
+        del _thread_local.session
+
+
 DEFAULT_CONCURRENCY = 5
 
 
@@ -591,9 +600,11 @@ def get_config():
         "polish_defaults": POLISH_DEFAULT_PARAMS,
     })
 
+import atexit
+atexit.register(_close_session)
 
 if __name__ == "__main__":
     os.makedirs("static", exist_ok=True)
     print(f"TxtLlmHub 启动: http://127.0.0.1:5000")
     print(f"LLM API: {LLM_API_URL}")
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="127.0.0.1", port=5000, debug=False)

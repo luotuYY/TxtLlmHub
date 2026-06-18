@@ -118,7 +118,7 @@ async function translatePreviewSelected() {
   clearLog();
   var items = indices.map(function (idx) { return state.lines[idx]; });
   var mode = state.translateMode;
-  log('开始批量' + (mode === 'polish' ? '润色' : '翻译') + '勾选条目，共' + items.length + '行，并发' + (parseInt($('concurrency').value) || 3));
+  log('开始批量' + (mode === 'polish' ? '润色' : '翻译') + '勾选条目，共' + items.length + '行，并发' + (parseInt($('concurrency').value) || 5));
   var result = await translateBatchItems(items);
   var wasAborted = result.wasAborted;
   exitTranslatingState();
@@ -169,9 +169,14 @@ async function translateAll() {
   finish();
 
   if (wasTranslating && !wasAborted) {
-    state._resumeMode = true;
-    log('恢复之前的翻译任务...');
-    translateAll();
+    var stillPending = state.lines.filter(function (l) { return !l.new_translation && !l.error; }).length;
+    if (stillPending > 0) {
+      state._resumeMode = true;
+      log('恢复之前的翻译任务（剩余 ' + stillPending + ' 行）...');
+      translateAll();
+    } else {
+      log('所有行已翻译完成');
+    }
   }
 }
 
@@ -192,7 +197,7 @@ async function retryFailed() {
   $('btnExport').disabled = true;
   _startRuntime();
   clearLog();
-  log('重试失败行，共' + failed.length + '行，并发' + (parseInt($('concurrency').value) || 3));
+  log('重试失败行，共' + failed.length + '行，并发' + (parseInt($('concurrency').value) || 5));
   var result = await translateBatchItems(failed);
   var wasAborted = result.wasAborted;
   exitTranslatingState();
@@ -232,9 +237,12 @@ async function retrySelected() {
   if (!wasAborted && !wasTranslating) showToast('重译完成：成功' + ok + '行' + (err ? '，失败' + err + '行' : ''));
 
   if (wasTranslating && !wasAborted) {
-    state._resumeMode = true;
-    log('恢复之前的翻译任务...');
-    translateAll();
+    var stillPending2 = state.lines.filter(function (l) { return !l.new_translation && !l.error; }).length;
+    if (stillPending2 > 0) {
+      state._resumeMode = true;
+      log('恢复之前的翻译任务（剩余 ' + stillPending2 + ' 行）...');
+      translateAll();
+    }
   }
 }
 
@@ -314,9 +322,12 @@ async function retryOne(index, e) {
   log('[' + (index + 1) + '] 单行重译完成');
 
   if (wasTranslating) {
-    state._resumeMode = true;
-    log('恢复之前的翻译任务...');
-    translateAll();
+    var stillPending3 = state.lines.filter(function (l) { return !l.new_translation && !l.error; }).length;
+    if (stillPending3 > 0) {
+      state._resumeMode = true;
+      log('恢复之前的翻译任务（剩余 ' + stillPending3 + ' 行）...');
+      translateAll();
+    }
   }
 }
 
@@ -584,6 +595,8 @@ function buildFileContent(groupLines) {
 }
 
 function triggerDownload(filename, fcontent) {
+  // 清理文件名中的特殊字符
+  filename = filename.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_');
   var blob = new Blob([fcontent], { type: 'text/plain;charset=utf-8' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -610,12 +623,13 @@ function triggerDownload(filename, fcontent) {
     grid.style.gridTemplateColumns = colRatio + 'fr ' + (1 - colRatio) + 'fr';
     grid.style.gridTemplateRows = rowRatio + 'fr ' + (1 - rowRatio) + 'fr';
     var gr = grid.getBoundingClientRect();
+    var hr = hit.parentElement.getBoundingClientRect();
     var P = 14, G = 14;
     var freeW = gr.width - 2 * P - G, freeH = gr.height - 2 * P - G;
     var gapX = P + colRatio * freeW + G / 2;
     var gapY = P + rowRatio * freeH + G / 2;
-    hit.style.left = (gapX + hit.offsetWidth / 2 - 14) + 'px';
-    hit.style.top = (gapY + hit.offsetHeight / 2 + 40) + 'px';
+    hit.style.left = (gapX + (gr.left - hr.left)) + 'px';
+    hit.style.top = (gapY + (gr.top - hr.top)) + 'px';
   }
   requestAnimationFrame(function () { requestAnimationFrame(apply); });
 

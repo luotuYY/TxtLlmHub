@@ -16,8 +16,8 @@ var tagState = {
   previewRowLimit: 2000,
 };
 
-// ── 分类体系 ──
-var TAG_CATEGORIES = {
+// ── 分类体系（动态 schema，支持前端自定义） ──
+var DEFAULT_TAG_SCHEMA = {
   '硬术语': {
     color: '#4fc3f7', icon: '🔧',
     subs: ['UI文本', '菜单/按钮', '属性/状态', '物品/装备', '技能/招式', '系统提示', 'Mod/插件', '代码标识符']
@@ -28,10 +28,37 @@ var TAG_CATEGORIES = {
   }
 };
 
+function getTagSchema() {
+  try {
+    var saved = localStorage.getItem('tllmh_tag_schema');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      if (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) { /* ignore corrupt data */ }
+  return DEFAULT_TAG_SCHEMA;
+}
+
+function getEnabledSchema() {
+  var schema = getTagSchema();
+  var result = {};
+  Object.keys(schema).forEach(function(k) {
+    if (schema[k].enabled !== false) result[k] = schema[k];
+  });
+  return result;
+}
+
+function saveTagSchema(schema) {
+  localStorage.setItem('tllmh_tag_schema', JSON.stringify(schema));
+}
+
 function getAllSubCategories() {
+  var schema = getEnabledSchema();
   var r = [];
-  Object.keys(TAG_CATEGORIES).forEach(function(l1) {
-    TAG_CATEGORIES[l1].subs.forEach(function(l2) { r.push({l1:l1, l2:l2, label:l1+' / '+l2}); });
+  Object.keys(schema).forEach(function(l1) {
+    schema[l1].subs.forEach(function(l2) { r.push({l1:l1, l2:l2, label:l1+' / '+l2}); });
   });
   return r;
 }
@@ -217,7 +244,7 @@ function tagRenderPreview() {
   lines.forEach(function(l) {
     var tagBadge = '';
     if (l.tag_l1) {
-      var cat = TAG_CATEGORIES[l.tag_l1];
+      var cat = getEnabledSchema()[l.tag_l1];
       tagBadge = '<span class="tag-badge" style="background:' + (cat ? cat.color : '#888') + '">' +
         escHtml(l.tag_l1) + (l.tag_l2 ? ' / ' + escHtml(l.tag_l2) : '') + '</span>';
     }
@@ -241,9 +268,24 @@ var TAG_MAX_CARDS = 200; // 每栏最多渲染 200 张卡片
 function tagRenderColumns() {
   var container = document.getElementById('tagColumns');
   if (!container) return;
+  var schema = getEnabledSchema();
+  var validL1 = Object.keys(schema);
+  // 清洗数据：将不属于当前 schema 的词条重置为未分类
+  tagState.lines.forEach(function(l) {
+    if (l.tag_l1 && validL1.indexOf(l.tag_l1) === -1) {
+      l.tag_l1 = '';
+      l.tag_l2 = '';
+      l.confidence = 0;
+    }
+    if (l.tag_l1 && schema[l.tag_l1]) {
+      if (schema[l.tag_l1].subs.indexOf(l.tag_l2) === -1) {
+        l.tag_l2 = schema[l.tag_l1].subs[0] || '';
+      }
+    }
+  });
   var html = '';
-  Object.keys(TAG_CATEGORIES).forEach(function(l1) {
-    var cat = TAG_CATEGORIES[l1];
+  Object.keys(schema).forEach(function(l1) {
+    var cat = schema[l1];
     var items = tagState.lines.filter(function(l) { return l.tag_l1 === l1; });
     var shown = items.slice(0, TAG_MAX_CARDS);
     html += '<div class="tag-column" data-l1="' + l1 + '">' +
@@ -273,48 +315,69 @@ function tagRenderColumns() {
   container.innerHTML = html;
   // 如果分类标签面板处于展开状态，同步刷新
   var catPanel = document.getElementById('tagCatPanel');
-  if (catPanel && catPanel.style.display === 'flex') tagRenderCatPanel();
+  if (catPanel && catPanel.classList.contains('visible')) tagRenderCatPanel();
 }
 
 // ── 单条卡片更新（分词进行时不重建整个列表） ──
 function tagUpdateOneCard(line) {
   var oldCard = document.querySelector('.tag-card[data-index="' + line.index + '"]');
+  var cat = line.tag_l1 ? getEnabledSchema()[line.tag_l1] : null;
+  var bc = cat ? cat.color : '#555';
+  var expectedL1 = line.tag_l1 || '';
+
   if (oldCard) {
-    // 卡片已存在，原地更新内容
-    var cat = line.tag_l1 ? TAG_CATEGORIES[line.tag_l1] : null;
-    var bc = cat ? cat.color : '#555';
+    // 更新内容
     oldCard.style.borderLeftColor = bc;
     var tagEl = oldCard.querySelector('.tag-card-tag');
     if (tagEl) tagEl.innerHTML = line.tag_l2
       ? escHtml(line.tag_l2) + (line.confidence > 0 ? ' <span class="tag-confidence">' + Math.round(line.confidence*100) + '%</span>' : '')
       : '<span style="color:var(--text-muted)">未标注</span>' + (line.confidence > 0 ? ' <span class="tag-confidence">' + Math.round(line.confidence*100) + '%</span>' : '');
-    // 如果分类变了，需要移到正确的栏
-    var parentBody = oldCard.closest('.tag-column-body');
-    var targetL1 = parentBody ? parentBody.dataset.l1 : '';
-    if (targetL1 !== (line.tag_l1 || '')) {
+
+    // 用 data-l1 属性判断卡片是否在正确栏（比 parentBody 更可靠）
+    var cardL1 = oldCard.getAttribute('data-l1') || '';
+    if (cardL1 !== expectedL1) {
+      // 需要移动
+      var srcBody = oldCard.closest('.tag-column-body');
       oldCard.remove();
-      var targetBody = document.querySelector('.tag-column-body[data-l1="' + (line.tag_l1 || '') + '"]');
+      // 源栏变空时恢复空状态提示
+      if (srcBody && srcBody.querySelectorAll('.tag-card').length === 0) {
+        var srcL1 = srcBody.dataset.l1 || '';
+        var emptyMsg = (!srcL1 && tagState.lines.filter(function(l){return !l.tag_l1;}).length === 0 && tagState.lines.length > 0)
+          ? '所有词条已分类 ✓' : '拖入词条或运行分词';
+        srcBody.insertAdjacentHTML('beforeend', '<div class="tag-column-empty">' + emptyMsg + '</div>');
+      }
+      // 插入目标栏
+      var targetBody = document.querySelector('.tag-column-body[data-l1="' + expectedL1 + '"]');
       if (targetBody) {
         var empty = targetBody.querySelector('.tag-column-empty');
         if (empty) empty.remove();
         targetBody.insertAdjacentHTML('beforeend', tagRenderCard(line));
+        // 更新新卡片的 data-l1
+        var newCard = targetBody.querySelector('.tag-card[data-index="' + line.index + '"]');
+        if (newCard) newCard.setAttribute('data-l1', expectedL1);
       }
       tagUpdateCounts();
+    } else {
+      // 已在正确栏，更新 data-l1 以防万一
+      oldCard.setAttribute('data-l1', expectedL1);
     }
   } else {
-    // 新卡片，追加到未分类栏
-    var untagged = document.querySelector('.tag-column-body[data-l1=""]');
-    if (untagged) {
-      var empty2 = untagged.querySelector('.tag-column-empty');
+    // 新卡片，追加到目标栏（优先目标栏，而非固定追加到未分类）
+    var targetBody2 = document.querySelector('.tag-column-body[data-l1="' + expectedL1 + '"]');
+    if (targetBody2) {
+      var empty2 = targetBody2.querySelector('.tag-column-empty');
       if (empty2) empty2.remove();
-      untagged.insertAdjacentHTML('beforeend', tagRenderCard(line));
+      targetBody2.insertAdjacentHTML('beforeend', tagRenderCard(line));
+      var newCard2 = targetBody2.querySelector('.tag-card[data-index="' + line.index + '"]');
+      if (newCard2) newCard2.setAttribute('data-l1', expectedL1);
     }
   }
 }
 
 // ── 更新各栏计数 ──
 function tagUpdateCounts() {
-  Object.keys(TAG_CATEGORIES).forEach(function(l1) {
+  var schema = getEnabledSchema();
+  Object.keys(schema).forEach(function(l1) {
     var el = document.getElementById('cnt-' + l1);
     if (el) el.textContent = tagState.lines.filter(function(l) { return l.tag_l1 === l1; }).length;
   });
@@ -323,17 +386,20 @@ function tagUpdateCounts() {
 }
 
 function tagRenderCard(l) {
-  var cat = l.tag_l1 ? TAG_CATEGORIES[l.tag_l1] : null;
+  var cat = l.tag_l1 ? getEnabledSchema()[l.tag_l1] : null;
   var bc = cat ? cat.color : '#555';
-  return '<div class="tag-card" draggable="true" data-index="' + l.index + '" ' +
+  return '<div class="tag-card" draggable="true" data-index="' + l.index + '" data-l1="' + escHtml(l.tag_l1 || '') + '" ' +
     'ondragstart="tagCardDragStart(event)" ondragend="tagCardDragEnd(event)" ' +
     'style="border-left:3px solid ' + bc + '">' +
-    '<div class="tag-card-num">#' + (l.index+1) + '</div>' +
-    '<div class="tag-card-orig">' + escHtml(l.original) + '</div>' +
+    '<div class="tag-card-row1">' +
+      '<span class="tag-card-num">#' + (l.index+1) + '</span>' +
+      '<span class="tag-card-orig">' + escHtml(l.original) + '</span>' +
+      '<span class="tag-card-actions"><button class="btn btn-sm" onclick="tagEditCategory(' + l.index + ')">✏️</button></span>' +
+    '</div>' +
     (l.translation ? '<div class="tag-card-tran">' + escHtml(l.translation) + '</div>' : '') +
     '<div class="tag-card-tag">' + (l.tag_l2 ? escHtml(l.tag_l2) : '<span style="color:var(--text-muted)">未标注</span>') +
     (l.confidence > 0 ? ' <span class="tag-confidence">' + Math.round(l.confidence*100) + '%</span>' : '') +
-    '</div><div class="tag-card-actions"><button class="btn btn-sm" onclick="tagEditCategory(' + l.index + ')">✏️</button></div></div>';
+    '</div></div>';
 }
 
 // ── 拖拽 ──
@@ -361,9 +427,10 @@ function tagDrop(e) {
     }
   }
   line.tag_l1 = targetL1;
-  if (targetL1 && TAG_CATEGORIES[targetL1]) {
-    if (!line.tag_l2 || (TAG_CATEGORIES[line.tag_l1] && TAG_CATEGORIES[line.tag_l1].subs.indexOf(line.tag_l2)===-1))
-      line.tag_l2 = TAG_CATEGORIES[targetL1].subs[0] || '';
+  var dropSchema = getEnabledSchema();
+  if (targetL1 && dropSchema[targetL1]) {
+    if (!line.tag_l2 || (dropSchema[line.tag_l1] && dropSchema[line.tag_l1].subs.indexOf(line.tag_l2)===-1))
+      line.tag_l2 = dropSchema[targetL1].subs[0] || '';
   } else { line.tag_l1 = ''; line.tag_l2 = ''; }
   tagRenderColumns(); tagRenderPreview();
   showToast('已移至 ' + (targetL1 || '未分类')); _tagDragIdx = -1;
@@ -389,8 +456,13 @@ function tagEditCategory(index) {
     document.body.appendChild(modal);
   }
   document.getElementById('tagEditContent').innerHTML =
-    '<div style="margin-bottom:8px"><span style="font-size:0.8rem;color:var(--text-secondary)">原文：</span>' +
-    '<span style="font-size:0.8rem">' + escHtml(line.original.substring(0,60)) + '</span></div>' +
+    '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:6px;border-left:3px solid var(--accent)">' +
+      '<div style="margin-bottom:4px"><span style="font-size:0.72rem;color:var(--text-muted)">原文</span></div>' +
+      '<div style="font-size:0.82rem;color:var(--text);line-height:1.5;word-break:break-all">' + escHtml(line.original) + '</div>' +
+      (line.translation ? '<div style="margin-top:6px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px">' +
+        '<div style="margin-bottom:2px"><span style="font-size:0.72rem;color:var(--text-muted)">译文</span></div>' +
+        '<div style="font-size:0.82rem;color:var(--accent);line-height:1.5;word-break:break-all">' + escHtml(line.translation) + '</div></div>' : '') +
+    '</div>' +
     '<div style="position:relative;margin-bottom:8px"><input type="text" id="tagEditSearch" placeholder="搜索类目..." class="param-input" style="width:100%" oninput="tagEditFilter()" autocomplete="off">' +
     '<div id="tagEditDropdown" class="tag-edit-dropdown" style="display:none"></div></div>' +
     '<select id="tagEditSelect" class="param-input" style="width:100%;margin-top:4px" onchange="tagEditSelectChange()">' + options + '</select>';
@@ -399,6 +471,7 @@ function tagEditCategory(index) {
     var sel = document.getElementById('tagEditSelect').value;
     if (sel) { var p = sel.split('|'); line.tag_l1 = p[0]; line.tag_l2 = p[1]||''; }
     else { line.tag_l1 = ''; line.tag_l2 = ''; }
+    line._manualEdit = true;  // 标记为手动编辑，防止被 LLM 结果覆盖
     modal.style.display = 'none'; tagRenderColumns(); tagRenderPreview();
   };
   document.getElementById('tagEditCancel').onclick = function() { modal.style.display = 'none'; };
@@ -411,7 +484,8 @@ function tagEditFilter() {
   if (!q) { dd.style.display='none'; return; }
   var matchItems = getAllSubCategories().filter(function(s){ return s.label.toLowerCase().indexOf(q)>=0 || s.l2.toLowerCase().indexOf(q)>=0; });
   if (matchItems.length===0) { dd.style.display='none'; return; }
-  var h=''; matchItems.forEach(function(s){ h+='<div class="tag-edit-option" onclick="tagEditPick(\''+s.l1+'\',\''+s.l2+'\')"><span style="color:'+TAG_CATEGORIES[s.l1].color+'">'+escHtml(s.l1)+'</span> / '+escHtml(s.l2)+'</div>'; });
+  var editSchema = getEnabledSchema();
+  var h=''; matchItems.forEach(function(s){ h+='<div class="tag-edit-option" onclick="tagEditPick(\''+s.l1+'\',\''+s.l2+'\')"><span style="color:'+(editSchema[s.l1]?editSchema[s.l1].color:'#888')+'">'+escHtml(s.l1)+'</span> / '+escHtml(s.l2)+'</div>'; });
   dd.innerHTML=h; dd.style.display='block';
 }
 function tagEditPick(l1,l2) {
@@ -428,7 +502,7 @@ async function tagStart() {
   document.getElementById('tagBtnStart').disabled = true;
   document.getElementById('tagBtnStop').disabled = false;
   _tagStartRuntime(); tagLogClear(); tagLog('开始分词，共 ' + tagState.lines.length + ' 行');
-  var concurrency = parseInt(document.getElementById('tagConcurrency').value) || 3;
+  var concurrency = parseInt(document.getElementById('tagConcurrency').value) || 5;
   var apiConfig = tagGetApiConfig();
   var total = tagState.lines.length, done = 0, errors = 0;
   for (var start = 0; start < total; start += concurrency) {
@@ -447,18 +521,30 @@ async function tagStart() {
         return r;
       });
     }));
+    var chunkErr = 0;
     results.forEach(function(r,i) {
-      if (r.error) { errors++; }
-      else { chunk[i].tag_l1=r.tag_l1; chunk[i].tag_l2=r.tag_l2; chunk[i].confidence=r.confidence||0; }
+      if (r.error) { errors++; chunkErr++; }
+      else if (chunk[i]._manualEdit) {
+        // 跳过已手动编辑的词条，不覆盖用户分类
+      }
+      else {
+        chunk[i].tag_l1=r.tag_l1; chunk[i].tag_l2=r.tag_l2; chunk[i].confidence=r.confidence||0;
+        // 增量更新这张卡片（不重建整个列）
+        tagUpdateOneCard(chunk[i]);
+      }
     });
     done += chunk.length;
     document.getElementById('tagProgressFill').style.width = (done/total*100)+'%';
     document.getElementById('tagProgressText').textContent = '进度: '+done+'/'+total+' · 成功'+(done-errors)+' · 失败'+errors;
-    tagLog('块'+(Math.floor(start/concurrency)+1)+': 完成 · 成功'+(chunk.length-(errors>0?1:0))+' · 失败'+(errors>0?1:0), 'ok');
-    tagRenderColumns();
+    tagLog('块'+(Math.floor(start/concurrency)+1)+': 完成 · 成功'+(chunk.length-chunkErr)+(chunkErr?' · 失败'+chunkErr:''), chunkErr?'err':'ok');
+    // 增量更新已在循环中逐条完成，只需更新计数
+    tagUpdateCounts();
     tagRenderPreview();
   }
   tagState.translating=false; tagState.abort=false; _tagStopRuntime();
+  // 最终全量同步（确保增量更新中的边界情况被修正）
+  tagRenderColumns();
+  tagRenderPreview();
   document.getElementById('tagBtnStart').disabled=false;
   document.getElementById('tagBtnStop').disabled=true;
   tagLog('分词结束: 成功'+(done-errors)+'行'+(errors?' · 失败'+errors+'行':''), errors?'err':'ok');
@@ -470,7 +556,8 @@ async function tagOneLine(line, apiConfig) {
   if (!line.original.trim()) return {tag_l1:'',tag_l2:'',confidence:0};
   try {
     var catDesc = '';
-    Object.keys(TAG_CATEGORIES).forEach(function(l1) { catDesc += l1+': '+TAG_CATEGORIES[l1].subs.join(', ')+'\n'; });
+    var llmSchema = getEnabledSchema();
+    Object.keys(llmSchema).forEach(function(l1) { catDesc += l1+': '+llmSchema[l1].subs.join(', ')+'\n'; });
     var systemPrompt = '你是一个游戏文本分类专家。请将以下文本归入最合适的类别。\n\n可用类别（一级 / 二级）：\n'+catDesc+
       '\n请严格输出以下JSON格式：{"l1":"一级类目","l2":"二级类目","confidence":0.0~1.0}\n只输出JSON，不要其他内容。';
     var body = Object.assign({text: line.original, system_prompt: systemPrompt, max_tokens: 100, temperature: 0.1}, apiConfig);
@@ -487,12 +574,13 @@ function tagParseResponse(text) {
     if (s===-1||e===-1) return {tag_l1:'',tag_l2:'',confidence:0};
     var j = JSON.parse(text.substring(s,e+1));
     var l1 = j.l1||'', l2 = j.l2||'', conf = j.confidence||0;
-    if (!TAG_CATEGORIES[l1]) {
-      var keys = Object.keys(TAG_CATEGORIES);
+    var parseSchema = getEnabledSchema();
+    if (!parseSchema[l1]) {
+      var keys = Object.keys(parseSchema);
       for (var i=0;i<keys.length;i++) { if (l1.indexOf(keys[i])>=0||keys[i].indexOf(l1)>=0) { l1=keys[i]; break; } }
-      if (!TAG_CATEGORIES[l1]) return {tag_l1:'',tag_l2:'',confidence:0};
+      if (!parseSchema[l1]) return {tag_l1:'',tag_l2:'',confidence:0};
     }
-    var subs = TAG_CATEGORIES[l1].subs;
+    var subs = parseSchema[l1].subs;
     if (subs.indexOf(l2)===-1) {
       for (var j2=0;j2<subs.length;j2++) { if (l2.indexOf(subs[j2])>=0||subs[j2].indexOf(l2)>=0) { l2=subs[j2]; break; } }
       if (subs.indexOf(l2)===-1) l2 = subs[0]||'';
@@ -519,7 +607,8 @@ function tagExport() {
   var tagged = tagState.lines.filter(function(l){return l.tag_l1;});
   if (tagged.length===0) { showToast('没有已分类的词条'); return; }
   var parts = [], total = 0;
-  Object.keys(TAG_CATEGORIES).forEach(function(l1) {
+  var exportSchema = getEnabledSchema();
+  Object.keys(exportSchema).forEach(function(l1) {
     var items = tagged.filter(function(l){return l.tag_l1===l1;});
     if (items.length===0) return;
     parts.push('=== '+l1+' ('+items.length+'条) ===');
@@ -544,7 +633,7 @@ function tagExport() {
 function tagExportSeparate() {
   var tagged = tagState.lines.filter(function(l){return l.tag_l1;});
   if (tagged.length===0) { showToast('没有已分类的词条'); return; }
-  var cats = Object.keys(TAG_CATEGORIES), files = 0;
+  var cats = Object.keys(getEnabledSchema()), files = 0;
   (function next(i) {
     if (i>=cats.length) {
       var u = tagState.lines.filter(function(l){return !l.tag_l1;});
@@ -602,11 +691,11 @@ function tagLogClear() { var a=document.getElementById('tagLogArea'); if(a){a.in
 function tagToggleCatPanel() {
   var panel = document.getElementById('tagCatPanel');
   var toggle = document.getElementById('tagCatToggle');
-  if (panel.style.display === 'flex') {
-    panel.style.display = 'none';
+  if (panel.classList.contains('visible')) {
+    panel.classList.remove('visible');
     toggle.textContent = '分类标签 ▼';
   } else {
-    panel.style.display = 'flex';
+    panel.classList.add('visible');
     toggle.textContent = '分类标签 ▲';
     tagRenderCatPanel();
   }
@@ -615,22 +704,23 @@ function tagToggleCatPanel() {
 function tagRenderCatPanel() {
   var panel = document.getElementById('tagCatPanel');
   if (!panel) return;
+  var schema = getEnabledSchema();
   var html = '';
-  Object.keys(TAG_CATEGORIES).forEach(function(l1) {
-    var cat = TAG_CATEGORIES[l1];
+  Object.keys(schema).forEach(function(l1) {
+    var cat = schema[l1];
     var count = tagState.lines.filter(function(l) { return l.tag_l1 === l1; }).length;
-    html += '<div class="tag-cat-group" style="border-left:3px solid ' + cat.color + ';padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:0 8px 8px 0">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-        '<span style="font-size:1.2rem">' + cat.icon + '</span>' +
-        '<span style="font-weight:600;font-size:0.85rem;color:' + cat.color + '">' + escHtml(l1) + '</span>' +
-        '<span style="font-size:0.68rem;color:var(--text-muted);margin-left:auto">' + count + ' 条</span>' +
+    html += '<div class="tag-cat-group" style="border-left:3px solid ' + cat.color + '">' +
+      '<div class="tag-cat-group-head">' +
+        '<span class="tag-cat-icon">' + cat.icon + '</span>' +
+        '<span class="tag-cat-name" style="color:' + cat.color + '">' + escHtml(l1) + '</span>' +
+        '<span class="tag-cat-count">' + count + '</span>' +
       '</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      '<div class="tag-cat-subs">';
     cat.subs.forEach(function(l2) {
       var subCount = tagState.lines.filter(function(l) { return l.tag_l1 === l1 && l.tag_l2 === l2; }).length;
-      html += '<span class="tag-cat-chip" style="background:' + cat.color + '22;border:1px solid ' + cat.color + '44;color:' + cat.color + ';padding:2px 8px;border-radius:12px;font-size:0.7rem;white-space:nowrap">' +
+      html += '<span class="tag-cat-chip" style="background:' + cat.color + '22;border-color:' + cat.color + '44;color:' + cat.color + '">' +
         escHtml(l2) +
-        (subCount > 0 ? ' <span style="opacity:0.7">' + subCount + '</span>' : '') +
+        (subCount > 0 ? ' <span class="tag-cat-chip-cnt">' + subCount + '</span>' : '') +
         '</span>';
     });
     html += '</div></div>';
@@ -641,6 +731,126 @@ function tagRenderCatPanel() {
     html += '<div style="padding:6px 12px;color:var(--text-muted);font-size:0.73rem">📋 未分类：' + untagged + ' 条</div>';
   }
   panel.innerHTML = html;
+}
+
+// ── 管理标签面板（可视化增删改一级/二级类目） ──
+function tagOpenAdmin() {
+  var schema = getTagSchema();
+  var modal = document.getElementById('tagAdminModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'tagAdminModal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    modal.innerHTML = '<div class="modal-box tag-admin-modal">' +
+      '<div class="modal-msg" style="font-weight:600;margin-bottom:8px">🏷️ 管理分类标签</div>' +
+      '<div id="tagAdminBody" class="tag-admin-body"></div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-primary" id="tagAdminSave">保存并关闭</button>' +
+        '<button class="btn" id="tagAdminCancel">取消</button>' +
+      '</div></div>';
+    document.body.appendChild(modal);
+    document.getElementById('tagAdminCancel').onclick = function() { modal.style.display = 'none'; };
+    document.getElementById('tagAdminSave').onclick = function() {
+      var newSchema = {};
+      var groups = document.querySelectorAll('.tag-admin-group');
+      groups.forEach(function(group) {
+        var nameInput = group.querySelector('.tag-admin-name');
+        var l1 = nameInput ? nameInput.value.trim() : '';
+        var color = group.querySelector('.tag-admin-color').value;
+        var icon = group.querySelector('.tag-admin-icon').value || '📌';
+        var enabled = group.querySelector('.tag-admin-enabled').checked;
+        var subs = [];
+        group.querySelectorAll('.tag-admin-sub').forEach(function(subInput) {
+          var val = subInput.value.trim();
+          if (val) subs.push(val);
+        });
+        if (l1 && subs.length > 0) {
+          newSchema[l1] = { color: color, icon: icon, subs: subs, enabled: enabled };
+        }
+      });
+      if (Object.keys(newSchema).length === 0) {
+        showToast('至少保留一个一级类目');
+        return;
+      }
+      saveTagSchema(newSchema);
+      modal.style.display = 'none';
+      tagRenderColumns();
+      tagRenderPreview();
+      tagRenderCatPanel();
+      tagBtnState();
+      showToast('标签体系已更新！');
+    };
+  }
+
+  // 渲染当前 schema 到管理面板
+  var body = document.getElementById('tagAdminBody');
+  var html = '<div class="tag-admin-hint">修改后点击保存，已分类的词条若所属类目被删除将自动移至“未分类”。</div>';
+  html += '<div id="tagAdminList">';
+  Object.keys(schema).forEach(function(l1) {
+    var cat = schema[l1];
+    html += '<div class="tag-admin-group' + (cat.enabled === false ? ' tag-admin-disabled' : '') + '" data-l1="' + escHtml(l1) + '">' +
+      '<div class="tag-admin-group-header">' +
+        '<label class="tag-admin-enabled-wrap" title="启用/禁用">' +
+          '<input type="checkbox" class="tag-admin-enabled"' + (cat.enabled !== false ? ' checked' : '') + ' onchange="this.closest(\'.tag-admin-group\').classList.toggle(\'tag-admin-disabled\', !this.checked)">' +
+        '</label>' +
+        '<input class="tag-admin-icon" value="' + escHtml(cat.icon || '📌') + '" style="width:30px;text-align:center">' +
+        '<input class="tag-admin-name" value="' + escHtml(l1) + '" style="flex:1">' +
+        '<input class="tag-admin-color" type="color" value="' + (cat.color || '#888') + '">' +
+        '<button class="btn btn-sm" onclick="tagAdminAddSub(this)">+子项</button>' +
+        '<button class="btn btn-sm tag-admin-del-btn" onclick="tagAdminRemoveGroup(this)">🗑</button>' +
+      '</div>' +
+      '<div class="tag-admin-subs">';
+    cat.subs.forEach(function(sub) {
+      html += '<span class="tag-admin-sub-wrap">' +
+        '<input class="tag-admin-sub" value="' + escHtml(sub) + '">' +
+        '<span class="tag-admin-sub-del" onclick="this.parentElement.remove()">&times;</span>' +
+      '</span>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  html += '<button class="btn btn-sm" onclick="tagAdminAddGroup()" style="margin-top:4px">＋ 添加一级类目</button>';
+  body.innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+function tagAdminAddSub(btn) {
+  var wrapper = btn.closest('.tag-admin-group').querySelector('.tag-admin-subs');
+  var span = document.createElement('span');
+  span.className = 'tag-admin-sub-wrap';
+  span.innerHTML = '<input class="tag-admin-sub" placeholder="新子项" value="">' +
+    '<span class="tag-admin-sub-del" onclick="this.parentElement.remove()">&times;</span>';
+  wrapper.appendChild(span);
+  span.querySelector('input').focus();
+}
+
+function tagAdminAddGroup() {
+  var list = document.getElementById('tagAdminList');
+  var newGroup = document.createElement('div');
+  newGroup.className = 'tag-admin-group';
+  newGroup.dataset.l1 = '新类目';
+  newGroup.innerHTML = '<div class="tag-admin-group-header">' +
+    '<label class="tag-admin-enabled-wrap" title="启用/禁用">' +
+      '<input type="checkbox" class="tag-admin-enabled" checked onchange="this.closest(\'.tag-admin-group\').classList.toggle(\'tag-admin-disabled\', !this.checked)">' +
+    '</label>' +
+    '<input class="tag-admin-icon" value="📌" style="width:30px;text-align:center">' +
+    '<input class="tag-admin-name" value="新类目" style="flex:1">' +
+    '<input class="tag-admin-color" type="color" value="#888888">' +
+    '<button class="btn btn-sm" onclick="tagAdminAddSub(this)">+子项</button>' +
+    '<button class="btn btn-sm tag-admin-del-btn" onclick="tagAdminRemoveGroup(this)">🗑</button>' +
+  '</div>' +
+  '<div class="tag-admin-subs"></div>';
+  list.appendChild(newGroup);
+  newGroup.querySelector('.tag-admin-name').focus();
+}
+
+function tagAdminRemoveGroup(btn) {
+  if (document.querySelectorAll('.tag-admin-group').length <= 1) {
+    showToast('至少保留一个一级类目');
+    return;
+  }
+  btn.closest('.tag-admin-group').remove();
 }
 
 // ── 初始化（SPA: 由 switchPage 调用，只执行一次） ──

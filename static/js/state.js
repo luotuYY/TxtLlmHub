@@ -511,4 +511,12 @@ setTimeout(function () { loadDefaults(); }, 0);
 
 // ── Connectivity check on startup + periodic polling ──
 checkLLM();
-setInterval(checkLLM, 15000);
+var _llmPollTimer = setInterval(checkLLM, 15000);
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) {
+    clearInterval(_llmPollTimer);
+    _llmPollTimer = 0;
+  } else {
+    if (!_llmPollTimer) { checkLLM(); _llmPollTimer = setInterval(checkLLM, 15000); }
+  }
+});

@@ -20,18 +20,16 @@ TxtLlmHub/
 ├── requirements.txt        # Python 依赖：flask + requests
 ├── start.bat               # Windows 一键启动
 ├── static/
-│   ├── index.html          # 翻译页面
-│   ├── tag.html            # 分词页面（完全独立）
+│   ├── index.html          # 翻译页 + 分词页（SPA 单页应用）
 │   ├── uta.jpg             # 背景图片
 │   ├── css/
-│   │   ├── style.css       # 全局样式
-│   │   └── tag.css         # 分词页专属样式
+│   │   └── style.css       # 全局样式（含分词页）
 │   └── js/
 │       ├── utils.js        # 工具函数（DOM、高亮、toast）
-│       ├── state.js        # 翻译页状态管理 + 提示词模板
-│       ├── api.js          # 翻译页 API 调用 + 文件管理
-│       ├── render.js       # 翻译页 DOM 渲染
-│       ├── app.js          # 翻译页事件处理 + 网格拖拽
+│       ├── state.js        # 状态管理 + 提示词模板 + LLM 配置
+│       ├── api.js          # API 调用 + 文件管理 + 批量翻译
+│       ├── render.js       # DOM 渲染（预览 + 对比表）
+│       ├── app.js          # 事件处理 + 网格拖拽 + 导出
 │       ├── tag.js          # 分词页完整逻辑（独立模块）
 │       └── particles.js    # 粒子特效
 └── README.md
@@ -40,32 +38,30 @@ TxtLlmHub/
 ## 架构
 
 ```
-┌─────────────────────┐    ┌─────────────────────┐
-│   翻译页 index.html  │    │   分词页 tag.html    │
-│   style.css          │    │   style.css          │
-│   state/api/render/  │    │   tag.css            │
-│   app.js             │    │   tag.js (独立)       │
-└──────────┬──────────┘    └──────────┬──────────┘
-           │ <a href> 浏览器跳转       │
-           └──────────┬───────────────┘
-                      │ HTTP
-┌─────────────────────▼─────────────────────┐
-│                  app.py                    │
-│  /api/upload  /api/manual-input            │
-│  /api/translate  /api/translate-polish      │
-│  /api/tag  /api/translate-batch(…-polish)  │
-│  /api/check-llm  /api/config               │
-│  ThreadPoolExecutor · requests.Session     │
-└─────────────────────┬─────────────────────┘
-                      │
-               ┌──────▼──────┐
-               │   LLM API   │
-               │ /v1/chat/   │
-               │ completions  │
-               └─────────────┘
+┌─────────────────────────────┐
+│  翻译页 + 分词页 (SPA)       │
+│  index.html                 │
+│  style.css                  │
+│  state/api/render/app.js    │
+│  tag.js (懒加载)             │
+└─────────────┬───────────────┘
+              │ HTTP
+┌─────────────▼───────────────┐
+│          app.py              │
+│  /api/upload /api/translate   │
+│  /api/tag /api/translate-batch│
+│  ThreadPoolExecutor           │
+│  requests.Session             │
+└─────────────┬───────────────┘
+              │
+       ┌──────▼──────┐
+       │   LLM API   │
+       │ /v1/chat/   │
+       │ completions  │
+       └─────────────┘
 ```
 
-**两个页面完全独立**：翻译页和分词页各自加载独立的 JS/CSS，通过 `<a>` 标签跳转，不共享 DOM 或状态。
+**SPA 单页架构**：翻译页和分词页在同一个 `index.html` 中通过 hash 路由切换（`#translate` / `#tag`），共享顶部工具栏和 API 配置。分词页 `tag.js` 由 `switchPage` 懒加载。
 
 ## 翻译功能
 

@@ -77,13 +77,13 @@
     <div class="card-header">
       <div class="header-left">📋 源文本预览 <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted);margin-left:4px">（悬停可见翻译按钮）</span></div>
       <div class="search-wrap" id="previewSearchWrap">
-        <select id="previewRowLimit" onchange="onPreviewRowLimitChange()" style="font-size:0.72rem;padding:1px 4px;background:var(--bg);color:var(--text);border:1px solid rgba(255,255,255,0.12);border-radius:4px;margin-right:4px">
+        <select id="previewRowLimit" onchange="onPreviewRowLimitChange()">
           <option value="2000">2000</option>
           <option value="5000">5000</option>
           <option value="-1">全部</option>
           <option value="-2">自定</option>
         </select>
-        <input id="previewCustomLimit" type="number" min="1" placeholder="行数" onchange="onPreviewCustomLimitChange()" class="preview-limit-input" style="display:none;width:56px;font-size:0.72rem;padding:1px 4px;background:var(--bg);color:var(--text);border:1px solid rgba(255,255,255,0.12);border-radius:4px;margin-right:4px">
+        <input id="previewCustomLimit" type="number" min="1" placeholder="行数" onchange="onPreviewCustomLimitChange()" class="preview-limit-input" style="display:none">
         <span class="search-count" id="previewSearchCount"></span>
         <input class="search-input" id="previewSearch" placeholder="搜索..." oninput="onPreviewSearch()">
         <span class="search-clear" onclick="clearPreviewSearch()">×</span>
@@ -220,13 +220,13 @@
           <div class="card-header">
             <div class="header-left">📋 源文本预览</div>
             <div class="search-wrap">
-              <select id="tagPreviewRowLimit" onchange="tagOnRowLimitChange()" style="font-size:0.72rem;padding:1px 4px;background:var(--bg);color:var(--text);border:1px solid rgba(255,255,255,0.12);border-radius:4px;margin-right:4px">
+              <select id="tagPreviewRowLimit" onchange="tagOnRowLimitChange()">
                 <option value="2000">2000</option>
                 <option value="5000">5000</option>
                 <option value="-1">全部</option>
                 <option value="-2">自定</option>
               </select>
-              <input id="tagPreviewCustomLimit" type="number" min="1" placeholder="行数" onchange="tagOnCustomLimitChange()" class="preview-limit-input" style="display:none;width:56px;font-size:0.72rem;padding:1px 4px;background:var(--bg);color:var(--text);border:1px solid rgba(255,255,255,0.12);border-radius:4px;margin-right:4px">
+              <input id="tagPreviewCustomLimit" type="number" min="1" placeholder="行数" onchange="tagOnCustomLimitChange()" class="preview-limit-input" style="display:none">
               <span class="search-count" id="tagPreviewCount">0 行</span>
               <input class="search-input" id="tagSearch" placeholder="搜索..." oninput="tagOnSearch()">
               <span class="search-clear" onclick="tagClearSearch()">×</span>
@@ -246,8 +246,9 @@
         <!-- 分类标签可视化（类似翻译页 System Prompt 折叠面板） -->
         <div style="margin-bottom:10px">
           <span class="prompt-toggle" id="tagCatToggle" onclick="tagToggleCatPanel()">分类标签 ▼</span>
+          <button class="btn btn-sm" onclick="tagOpenAdmin()" style="margin-left:6px">⚙️ 管理标签</button>
         </div>
-        <div id="tagCatPanel" style="display:none;flex-direction:column;gap:8px;margin-bottom:10px">
+        <div id="tagCatPanel" class="tag-cat-panel">
         </div>
         <div class="tag-controls">
           <button class="btn btn-primary" id="tagBtnStart" disabled onclick="tagStart()">开始分词</button>
@@ -256,7 +257,7 @@
           <button class="btn" id="tagBtnExport" disabled onclick="tagExport()">导出结果</button>
           <button class="btn" id="tagBtnExportSep" onclick="tagExportSeparate()">按类目分别导出</button>
           <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px">并发</span>
-          <input type="number" id="tagConcurrency" value="3" min="1" max="10" class="param-input" style="width:42px">
+          <input type="number" id="tagConcurrency" value="5" min="1" max="10" class="param-input" style="width:42px">
           <span id="tagRuntimeDisplay" style="display:none;font-size:0.72rem;color:var(--accent);margin-left:6px;font-variant-numeric:tabular-nums"></span>
         </div>
         <div class="tag-progress-wrap">

@@ -116,7 +116,7 @@ function renderCompare() {
     '</tr></thead><tbody>';
     rows.forEach(function (l) {
       var rowCls = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
-      compareHtml += '<tr class="' + rowCls + '">' +
+      compareHtml += '<tr class="' + rowCls + '" data-row-index="' + l.index + '">' +
         '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" onclick="onCompareCheck(this)" ' + (state.compareChecked.has(l.index) ? 'checked' : '') + '></td>' +
         '<td class="cell-copyable" onclick="copyOriginal(event)" title="点击复制">' + hl(l.original) + '</td>' +
         '<td>' + (l.translation ? hl(l.translation) : '\u2014') + '</td>' +
@@ -126,7 +126,7 @@ function renderCompare() {
           (l.warning && !l.truncated ? ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>' : '') +
         '</td>' +
         '<td class="col-actions">' +
-          '<button class="btn btn-sm" onclick="keepOld(' + l.index + ')" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : '') + '">保留译文</button>' +
+          '<button class="btn btn-sm" onclick="keepOld(' + l.index + ')" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
           '<button class="btn btn-sm" onclick="retryOne(' + l.index + ', event)">重译</button>' +
           '<button class="btn btn-sm" onclick="copyRow(' + l.index + ')" title="复制原文=译文">复制</button>' +
         '</td>' +
@@ -269,3 +269,52 @@ function initPreviewRowLimit() {
   if (sel) sel.value = '2000';
   state.previewRowLimit = 2000;
 }
+
+// ── 增量更新单行（翻译进行中避免全量重建） ──
+function updateCompareRow(index) {
+  var l = state.lines[index];
+  if (!l) return;
+  // 如果有搜索或排序激活，增量更新无意义，走全量
+  if (state.compareQuery || state.sortState !== 0) {
+    renderCompare();
+    return;
+  }
+  var row = document.querySelector('.compare-table tbody tr[data-row-index="' + index + '"]');
+  if (!row) {
+    // 行不存在（首次出现翻译结果），整体刷新一次
+    renderCompare();
+    return;
+  }
+  // 更新行样式
+  row.className = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
+  // 更新"新译文"列
+  var newCell = row.querySelector('.col-new');
+  if (newCell) {
+    if (l.error) {
+      newCell.innerHTML = '\u26A0 ' + escHtml(l.error);
+    } else if (l.new_translation === ' ') {
+      newCell.innerHTML = '<span class="cleared-mark">\u2014</span>';
+    } else {
+      var extra = '';
+      if (l.truncated) extra += ' <span title="响应被截断，翻译可能不完整" style="cursor:help">\u26A0\uFE0F</span>';
+      if (l.warning && !l.truncated) extra += ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>';
+      newCell.innerHTML = hl(l.new_translation) + extra;
+    }
+    // 恢复可编辑属性
+    newCell.className = 'cell-editable col-new';
+    newCell.onclick = function(e) { editTranslation(index, e); };
+    newCell.title = l.warning || '点击编辑';
+  }
+  // 更新"保留译文"按钮状态
+  var keepBtn = row.querySelector('.col-actions button[onclick^="keepOld"]');
+  if (keepBtn) {
+    keepBtn.disabled = !l.translation || l.keepOld;
+    keepBtn.title = !l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文';
+    keepBtn.textContent = l.keepOld ? '已保留' : '保留译文';
+  }
+}
+
+// ── 批量翻译开始/结束标记（用于增量更新判断） ──
+var _batchUpdating = false;
+function isBatchUpdating() { return _batchUpdating; }
+function setBatchUpdating(v) { _batchUpdating = v; }
