@@ -776,7 +776,7 @@ async function _tagRetagOnDrop(line, targetL1) {
   ) || '\u4f60\u662f\u4e00\u4e2a\u6e38\u620f\u6587\u672c\u5206\u7c7b\u4e13\u5bb6\u3002\u8bf7\u5c06\u4ee5\u4e0b\u6587\u672c\u5f52\u5165\u6700\u5408\u9002\u7684\u7c7b\u522b\u3002';
 
   var subsDesc = cat.subs.join(', ');
-  var prompt = strategyText + '\n\n\u8be5\u6761\u76ee\u5df2\u786e\u5b9a\u5c5e\u4e8e"' + targetL1 + '"\u7c7b\u522b\u3002\u8bf7\u5c06\u5176\u5f52\u5165\u4ee5\u4e0b\u5b50\u7c7b\u4e4b\u4e00:\n' + subsDesc + '\n\n\u8bf7\u4e25\u683c\u8f93\u51faJSON:{"tag_l1":"' + targetL1 + '","tag_l2":"\u5b50\u7c7b\u540d\u79f0","confidence":0.0~1.0}\n\u53ea\u8f93\u51faJSON\u3002';
+  var prompt = strategyText + '\n\n\u8be5\u6761\u76ee\u5df2\u786e\u5b9a\u5c5e\u4e8e"' + targetL1 + '"\u7c7b\u522b\u3002\u8bf7\u5c06\u5176\u5f52\u5165\u4ee5\u4e0b\u5b50\u7c7b\u4e4b\u4e00:\n' + subsDesc + '\n\n\u8bf7\u4e25\u683c\u8f93\u51faJSON:{"l1":"' + targetL1 + '","l2":"\u5b50\u7c7b\u540d\u79f0","confidence":0.0~1.0}\n\u53ea\u8f93\u51faJSON\u3002';
 
   var ok = false;
   try {
