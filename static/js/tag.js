@@ -1454,15 +1454,14 @@ function tagAdminImport() {
 }
 
 // ── 初始化(由 switchPage 懒调用,只执行一次) ──
+
 // ── 文件导入 ──
-var _tagFileBusy = false;
-function handleTagFiles() {
-  if (_tagFileBusy) return;
+function handleTagFiles(e) {
+  if (e && e.target !== e.currentTarget) return;
   if (window.showDirectoryPicker) {
-    pickTagDir().catch(function(e) {
-      if (e.name !== 'AbortError' && e.name !== 'SecurityError') {
-  _tagFileBusy = true;
-        document.getElementById('tagFileInput').click(); _tagFileBusy = false;
+    pickTagDir().catch(function(err) {
+      if (err.name !== 'AbortError' && err.name !== 'SecurityError') {
+        document.getElementById('tagFileInput').click();
       }
     });
   } else {
@@ -1482,6 +1481,7 @@ function handleTagFiles() {
     else showToast('未找到 .txt 文件');
   }
 }
+
 
 function tagInit() {
   // 绑定拖拽上传
