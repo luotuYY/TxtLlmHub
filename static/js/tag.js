@@ -665,10 +665,63 @@ function tagSendToTranslate(mode, gran, incUntagged) {
 
 // ── 卡片拖拽 ──
 var _tagDragIdx = -1;
-function tagCardDragStart(e) { _tagDragIdx = parseInt(e.target.closest('.tag-card').dataset.index); e.dataTransfer.effectAllowed='move'; e.target.closest('.tag-card').classList.add('dragging'); }
-function tagCardDragEnd(e) { document.querySelectorAll('.tag-card').forEach(function(el){el.classList.remove('dragging');}); document.querySelectorAll('.tag-column-body').forEach(function(el){el.classList.remove('drag-over-col');}); }
-function tagDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect='move'; e.currentTarget.classList.add('drag-over-col'); }
-function tagDragLeave(e) { e.currentTarget.classList.remove('drag-over-col'); }
+// RAF-throttled drag state
+var _dragOverTarget = null;
+var _dragRafId = 0;
+
+function tagCardDragStart(e) {
+  var card = e.target.closest('.tag-card');
+  _tagDragIdx = parseInt(card.dataset.index);
+  e.dataTransfer.effectAllowed = 'move';
+  // Freeze transitions on the dragged card for instant visual feedback
+  card.style.transition = 'none';
+  card.classList.add('dragging');
+}
+
+function tagCardDragEnd(e) {
+  // Cancel any pending RAF
+  if (_dragRafId) { cancelAnimationFrame(_dragRafId); _dragRafId = 0; }
+  // Only clean the dragged card, not all cards
+  var card = document.querySelector('.tag-card.dragging');
+  if (card) { card.classList.remove('dragging'); card.style.transition = ''; }
+  // Clean drag-over from all columns
+  document.querySelectorAll('.tag-column-body.drag-over-col').forEach(function(el){
+    el.classList.remove('drag-over-col');
+  });
+  _dragOverTarget = null;
+}
+
+function _tagApplyDragOver() {
+  _dragRafId = 0;
+  // Remove old highlight
+  if (_dragOverTarget) _dragOverTarget.classList.remove('drag-over-col');
+  // Get current element under cursor (use the last known target from drag events)
+  // This is set by tagDragOver/tagDragLeave before the RAF
+}
+
+function tagDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  var t = e.currentTarget;
+  if (_dragOverTarget === t) return; // same target, skip
+  // Clear old target immediately
+  if (_dragOverTarget) _dragOverTarget.classList.remove('drag-over-col');
+  _dragOverTarget = t;
+  // Apply new highlight only once per frame
+  if (!_dragRafId) _dragRafId = requestAnimationFrame(function(){
+    _dragRafId = 0;
+    if (_dragOverTarget) _dragOverTarget.classList.add('drag-over-col');
+  });
+}
+
+function tagDragLeave(e) {
+  var t = e.currentTarget;
+  // Only clear if leaving the current highlighted target
+  if (_dragOverTarget === t) {
+    t.classList.remove('drag-over-col');
+    _dragOverTarget = null;
+  }
+}
 function tagDrop(e) {
   e.preventDefault(); e.currentTarget.classList.remove('drag-over-col');
   var targetL1 = e.currentTarget.dataset.l1;
