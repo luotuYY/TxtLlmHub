@@ -55,6 +55,20 @@ function saveTagSchema(schema) {
   localStorage.setItem('tllmh_tag_schema', JSON.stringify(schema));
 }
 
+function getSubPool() {
+  try {
+    var saved = localStorage.getItem('tllmh_sub_pool');
+    if (saved) {
+      var arr = JSON.parse(saved);
+      if (Array.isArray(arr)) return arr;
+    }
+  } catch (e) { /* ignore */ }
+  return [];
+}
+function saveSubPool(pool) {
+  localStorage.setItem('tllmh_sub_pool', JSON.stringify(pool));
+}
+
 function getAllSubCategories() {
   var schema = getEnabledSchema();
   var r = [];
@@ -1131,7 +1145,15 @@ function tagAdminRemoveGroup(btn) {
     showToast('至少保留一个一级类目');
     return;
   }
-  btn.closest('.tag-admin-group').remove();
+  var group = btn.closest('.tag-admin-group');
+  var subInputs = group.querySelectorAll('.tag-admin-sub');
+  var pool = getSubPool();
+  subInputs.forEach(function(input) {
+    var val = (input.value || input.defaultValue || '').trim();
+    if (val && pool.indexOf(val) === -1) pool.push(val);
+  });
+  saveSubPool(pool);
+  group.remove();
 }
 
 function tagAdminExport() {
@@ -1240,6 +1262,7 @@ window.tagExport = tagExport;
 window.tagExportSeparate = tagExportSeparate;
 window.tagGetApiConfig = tagGetApiConfig;
 window.tagInit = tagInit;
+window.tagLoadManualInput = tagLoadManualInput;
 window.tagLoadStrategyPreset = tagLoadStrategyPreset;
 window.tagLog = tagLog;
 window.tagLogClear = tagLogClear;
@@ -1247,6 +1270,7 @@ window.tagOnCustomLimitChange = tagOnCustomLimitChange;
 window.tagOnRowLimitChange = tagOnRowLimitChange;
 window.tagOnSearch = tagOnSearch;
 window.tagOpenAdmin = tagOpenAdmin;
+window.tagProcessFiles = tagProcessFiles;
 window.tagRenderCard = tagRenderCard;
 window.tagRenderCatPanel = tagRenderCatPanel;
 window.tagRenderColumns = tagRenderColumns;
@@ -1255,6 +1279,7 @@ window.tagRenderPreview = tagRenderPreview;
 window.tagRenderStrategyPresets = tagRenderStrategyPresets;
 window.tagSelectAllInColumn = tagSelectAllInColumn;
 window.tagSendToTranslate = tagSendToTranslate;
+window.tagStart = tagStart;
 window.tagStop = tagStop;
 window.tagToggleCatPanel = tagToggleCatPanel;
 window.tagToggleCollapse = tagToggleCollapse;
