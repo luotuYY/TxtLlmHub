@@ -1047,7 +1047,7 @@ function tagOpenAdmin() {
             '<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:6px">拖入左侧分配 | 双击编辑 | 仅此处可删除</div>' +
             '<div class="tag-admin-pool" id="tagAdminPool" ondragover="event.preventDefault()" ondrop="tagAdminPoolDrop(event)"></div>' +
             '<div style="display:flex;gap:4px;margin-top:8px">' +
-            '<input id="tagAdminPoolInput" class="tag-admin-sub" placeholder="输入新二级类目" style="flex:1"' +
+            '<input id="tagAdminPoolInput" class="tag-admin-pool-input" placeholder="输入新二级类目" style="flex:1"' +
             ' onkeydown="if(event.key===\'Enter\')tagAdminAddToPool()">' +
             '<button class="btn btn-sm" onclick="tagAdminAddToPool()">+</button>' +
           '</div>' +
@@ -1288,8 +1288,9 @@ function tagAdminAddToPool() {
   var schema = getTagSchema(); var assigned = false;
   Object.keys(schema).forEach(function(l1) { if ((schema[l1].subs || []).indexOf(name) !== -1) assigned = true; });
   if (assigned) { showToast('该名称已在分类中使用'); return; }
-  pool.push(name); saveSubPool(pool); _refreshPool(); _autoSave();
+  pool.push(name); saveSubPool(pool);
   input.value = '';
+  _refreshPool(); _autoSave();
   input.focus();
 }
 
