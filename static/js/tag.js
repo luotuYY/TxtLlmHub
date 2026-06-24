@@ -1142,6 +1142,16 @@ function tagAdminAddSub(btn) {
   span.querySelector('input').focus();
 }
 
+
+function _randomAdminColor() {
+  var palette = ['#4fc3f7','#81c784','#ef5350','#ffb74d','#ce93d8','#90a4ae','#a1887f','#4dd0e1','#f06292','#aed581'];
+  var used = new Set();
+  document.querySelectorAll('.tag-admin-color').forEach(function(c) { used.add(c.value); });
+  var available = palette.filter(function(c) { return !used.has(c); });
+  if (available.length === 0) available = palette;
+  return available[Math.floor(Math.random() * available.length)];
+}
+
 function tagAdminAddGroup() {
   var list = document.getElementById('tagAdminList');
   var newGroup = document.createElement('div');
@@ -1156,7 +1166,7 @@ function tagAdminAddGroup() {
     '</label>' +
     '<input class="tag-admin-icon" value="📌" onchange="_autoSave()" style="width:30px;text-align:center">' +
     '<input class="tag-admin-name" value="新类目" ondblclick="this.readOnly=false;this.focus();this.select()" onblur="this.readOnly=true;_autoSave()" readonly style="flex:1">' +
-    '<input class="tag-admin-color" type="color" value="#888888" onchange="_autoSave()">' +
+    '<input class="tag-admin-color" type="color" value=' + _randomAdminColor() + ' onchange="_autoSave()">' +
     '<button class="btn btn-sm" onclick="tagAdminAddSub(this)">+子项</button>' +
     '<button class="btn btn-sm tag-admin-del-btn" onclick="tagAdminRemoveGroup(this)">🗑</button>' +
   '</div>' +
