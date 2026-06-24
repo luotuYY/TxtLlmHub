@@ -1253,8 +1253,13 @@ function tagAdminAddToPool() {
 // ── 刷新右侧池子 DOM ──
 function _refreshPool() {
   var container = document.getElementById('tagAdminPool'); if (!container) return;
-  var schema = getTagSchema(); var subPool = getSubPool();
-  var assignedSubs = new Set(); Object.keys(schema).forEach(function(l1) { (schema[l1].subs || []).forEach(function(s) { assignedSubs.add(s); }); });
+  var subPool = getSubPool();
+  var assignedSubs = new Set();
+  // 从当前DOM扫描已分配的子项（反映未保存的拖拽/删除操作）
+  document.querySelectorAll('.tag-admin-sub').forEach(function(input) {
+    var val = (input.value || input.defaultValue || '').trim();
+    if (val) assignedSubs.add(val);
+  });
   var available = subPool.filter(function(s) { return !assignedSubs.has(s); });
   if (available.length === 0) { container.innerHTML = '<div style="font-size:0.68rem;color:var(--text-muted);text-align:center;padding:12px 0">池中暂无二级类目<br>点击下方按钮添加</div>'; return; }
   var html = '';
