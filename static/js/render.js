@@ -217,7 +217,10 @@ function updateSelectAllPreview() {
       return matches(l.original, q) || matches(l.translation, q) || matches(l.new_translation, q);
     });
   } else {
-    visible = state.lines.slice(0, 200);
+    visible = state.lines;
+    if (state.previewRowLimit > 0 && visible.length > state.previewRowLimit) {
+      visible = visible.slice(0, state.previewRowLimit);
+    }
   }
   if (!visible.length) return;
   var allIndices = new Set();

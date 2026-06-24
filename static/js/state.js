@@ -732,7 +732,8 @@ function updateRetryButton() {
   // btnRetrySelected 常亮，由 retrySelected() 自行处理无选中
 }
 function updateExportCheckedButton() {
-  // btnExportChecked 常亮，由 exportCheckedRows() 自行处理无选中
+  var btn = btnExportChecked;
+  if (btn) btn.disabled = state.previewChecked.size === 0 && state.compareChecked.size === 0;
 }
 
 // ── Init: restore saved mode, then load defaults ──

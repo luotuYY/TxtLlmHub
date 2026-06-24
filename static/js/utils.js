@@ -40,7 +40,6 @@ function fallbackCopy(text) {
   ta.select();
   document.execCommand('copy');
   document.body.removeChild(ta);
-  showToast('已复制: ' + text.substring(0, 40));
 }
 
 // ── Natural Sort ──

@@ -8,7 +8,7 @@
 import { $, escHtml, showToast, log, naturalCompare, fallbackCopy } from './utils.js';
 import { state, rebuildIndicesAndCheckboxes, PRESET_PROMPTS, 
           updateTranslateAllButton, updateRetryButton, updateExportCheckedButton,
-          getLLMParams, getApiConfig } from './state.js';
+          getLLMParams, getApiConfig, checkLLM } from './state.js';
 import { processFiles } from './api.js';
 import { renderInternal, getCheckedFileNames, renderPreview, renderCompare, updateSearchUI,
           updateCompareRow, updatePreviewLine, updatePreviewSelectAllVisibility,
@@ -507,9 +507,11 @@ function copyOriginal(e) {
       showToast('已复制: ' + text.substring(0, 40));
     }).catch(function () {
       fallbackCopy(text);
+      showToast('已复制: ' + text.substring(0, 40));
     });
   } else {
     fallbackCopy(text);
+    showToast('已复制: ' + text.substring(0, 40));
   }
 }
 

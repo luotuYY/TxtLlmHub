@@ -2,6 +2,7 @@
 文件上传解析、LLM API 调用、批量流式翻译/润色/分词
 """
 import os
+import atexit
 import json
 import requests
 import re
@@ -739,8 +740,6 @@ def get_config():
         }
     })
 
-import atexit
-atexit.register(_close_session)
 
 # ═══════════════════════════════════════════
 # 去重模块
@@ -759,9 +758,7 @@ DEDUP_DEFAULT_STRATEGY = (
 )
 
 # 输出格式 → 追加在角色指令 + 待评估列表之后
-DEDUP_OUTPUT_FORMAT = (
-    "只输出最佳条目的序号（从0开始的数字），不要任何其他文字。"
-)
+
 
 
 def _parse_txt_with_index(content: str, filename: str = "") -> list[dict]:
@@ -1034,6 +1031,8 @@ def dedup_apply():
         },
     )
 
+
+atexit.register(_close_session)
 
 if __name__ == "__main__":
     os.makedirs("static", exist_ok=True)

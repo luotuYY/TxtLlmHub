@@ -790,16 +790,5 @@ import { state, getApiConfig } from './state.js';
   window.dedupInit = init;
 })();
 
-// ── Module exports: N/A (IIFE-wrapped, exposed via window) ──
-
-// ── Window bindings (HTML onclick compat) ──
-window.dedupInit = dedupInit;
-window.dedupStart = dedupStart;
-window.dedupStop = dedupStop;
-window.applyDedup = applyDedup;
-window.resetDedupStrategy = resetDedupStrategy;
-window.toggleDedupStrategy = toggleDedupStrategy;
-window.toggleDedupGroup = toggleDedupGroup;
-window._dedupSelect = _dedupSelect;
-window._dedupToggleFilter = _dedupToggleFilter;
-window.saveDedupParams = saveDedupParams;
+// ── Module exports (window bindings set inside IIFE above) ──
+export {};

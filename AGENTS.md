@@ -2,7 +2,6 @@
 
 <INSTRUCTIONS>
 用中文输出思考过程；
-注意编写脚本、代码时中文的编码问题
 </INSTRUCTIONS>
 
 ## 前端模块化要求
