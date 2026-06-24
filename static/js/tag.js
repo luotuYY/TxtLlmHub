@@ -1373,59 +1373,6 @@ function tagInit() {
   // 初始渲染
   tagRenderColumns();
 }
-
-// ── Window bindings (HTML onclick compat) ──
-window.tagAdminAddGroup = tagAdminAddGroup;
-window.tagAdminAddSub = tagAdminAddSub;
-window.tagAdminExport = tagAdminExport;
-window.tagAdminImport = tagAdminImport;
-window.tagAdminRemoveGroup = tagAdminRemoveGroup;
-window.tagBtnState = tagBtnState;
-window.tagCardDragEnd = tagCardDragEnd;
-window.tagCardDragStart = tagCardDragStart;
-window.tagClearAll = tagClearAll;
-window.tagClearSearch = tagClearSearch;
-window.tagDeleteFile = tagDeleteFile;
-window.tagDragLeave = tagDragLeave;
-window.tagDragOver = tagDragOver;
-window.tagDrop = tagDrop;
-window.tagEditCategory = tagEditCategory;
-window.tagEditFilter = tagEditFilter;
-window.tagEditPick = tagEditPick;
-window.tagEditSelectChange = tagEditSelectChange;
-window.tagExport = tagExport;
-window.tagExportSeparate = tagExportSeparate;
-window.tagGetApiConfig = tagGetApiConfig;
-window.tagInit = tagInit;
-window.tagLoadManualInput = tagLoadManualInput;
-window.tagLoadStrategyPreset = tagLoadStrategyPreset;
-window.tagLog = tagLog;
-window.tagLogClear = tagLogClear;
-window.tagOnCustomLimitChange = tagOnCustomLimitChange;
-window.tagOnRowLimitChange = tagOnRowLimitChange;
-window.tagOnSearch = tagOnSearch;
-window.tagOpenAdmin = tagOpenAdmin;
-window.tagProcessFiles = tagProcessFiles;
-window.tagRenderCard = tagRenderCard;
-window.tagRenderCatPanel = tagRenderCatPanel;
-window.tagRenderColumns = tagRenderColumns;
-window.tagRenderFileList = tagRenderFileList;
-window.tagRenderPreview = tagRenderPreview;
-window.tagRenderStrategyPresets = tagRenderStrategyPresets;
-window.tagSelectAllInColumn = tagSelectAllInColumn;
-window.tagSendToTranslate = tagSendToTranslate;
-window.tagStart = tagStart;
-window.tagStop = tagStop;
-window.tagToggleCatPanel = tagToggleCatPanel;
-window.tagToggleCollapse = tagToggleCollapse;
-window.tagToggleSelect = tagToggleSelect;
-window.tagToggleStrategy = tagToggleStrategy;
-window.tagTriggerDownload = tagTriggerDownload;
-window.tagUpdateColumnSelectAllStates = tagUpdateColumnSelectAllStates;
-window.tagUpdateCounts = tagUpdateCounts;
-window.tagUpdateOneCard = tagUpdateOneCard;
-window.tagUpdateTagStartButton = tagUpdateTagStartButton;
-
 // ── Window bindings (HTML onclick compat) ──
 window.tagAdminAddGroup = tagAdminAddGroup;
 window.tagAdminAddSub = tagAdminAddSub;
@@ -1456,6 +1403,7 @@ window.tagEditPick = tagEditPick;
 window.tagEditSelectChange = tagEditSelectChange;
 window.tagExport = tagExport;
 window.tagExportSeparate = tagExportSeparate;
+window.resetTagStrategy = resetTagStrategy;
 window.tagGetApiConfig = tagGetApiConfig;
 window.tagInit = tagInit;
 window.tagLoadManualInput = tagLoadManualInput;
@@ -1486,3 +1434,6 @@ window.tagUpdateColumnSelectAllStates = tagUpdateColumnSelectAllStates;
 window.tagUpdateCounts = tagUpdateCounts;
 window.tagUpdateOneCard = tagUpdateOneCard;
 window.tagUpdateTagStartButton = tagUpdateTagStartButton;
+
+// ── Module export
+export {};

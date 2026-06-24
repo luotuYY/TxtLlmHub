@@ -60,13 +60,13 @@ function switchPage(page) {
   // 分词页懒初始化
   if (page === 'tag' && !_tagInited) {
     _tagInited = true;
-    tagInit();
+    window.tagInit();
   }
 
   // 去重页懒初始化
   if (page === 'dedup' && !_dedupInited) {
     _dedupInited = true;
-    if (typeof dedupInit === 'function') dedupInit();
+    if (typeof window.dedupInit === 'function') window.dedupInit();
   }
 
   // 切换时刷新 LLM 状态
