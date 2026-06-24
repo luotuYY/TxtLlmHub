@@ -1074,7 +1074,7 @@ function tagOpenAdmin() {
         '<div class="tag-admin-group-header">' +
           '<label class="tag-admin-enabled-wrap" title="启用/禁用">' +
             '<input type="checkbox" class="tag-admin-enabled"' + (cat.enabled !== false ? ' checked' : '') +
-              '" onchange="this.closest(\'.tag-admin-group\').classList.toggle(\'tag-admin-disabled\', !this.checked)">"' +
+              ' onchange="this.closest(\'.tag-admin-group\').classList.toggle(\'tag-admin-disabled\', !this.checked)">' +
           '</label>' +
           '<input class="tag-admin-icon" value="' + escHtml(cat.icon || '📌') + '" style="width:30px;text-align:center">' +
           '<input class="tag-admin-name" value="' + escHtml(l1) + '" style="flex:1"' +
