@@ -13,7 +13,6 @@ var tagState = {
   abort: false,
   query: '',
   previewRowLimit: 2000,
-  selectedIndices: new Set(),
   tagStarted: false,  // 是否过分词任务(用于区分「开始」和「继续」)
 };
 
@@ -308,7 +307,6 @@ function tagRenderColumns() {
     var shown = displayLimit > 0 ? items.slice(0, displayLimit) : items;
     html += '<div class="tag-column" data-l1="' + l1 + '">' +
       '<div class="tag-column-header" style="border-left:3px solid ' + cat.color + '">' +
-      '<input type="checkbox" class="tag-column-select-all" data-l1="' + l1 + '" onchange="tagSelectAllInColumn(\'' + l1 + '\', this.checked)" title="全选/取消本分类">' +
       '<span class="tag-col-icon">' + cat.icon + '</span>' +
       '<span class="tag-col-title">' + escHtml(l1) + '</span>' +
       '<span class="tag-col-count" id="cnt-' + l1 + '">' + items.length + '</span></div>' +
@@ -324,7 +322,6 @@ function tagRenderColumns() {
   var unShown = untaggedLimit > 0 ? untagged.slice(0, untaggedLimit) : untagged;
   html += '<div class="tag-column tag-column-untagged">' +
     '<div class="tag-column-header" style="border-left:3px solid #888">' +
-    '<input type="checkbox" class="tag-column-select-all" data-l1="" onchange="tagSelectAllInColumn(\'\', this.checked)" title="全选/取消未分类">' +
     '<span class="tag-col-icon">📋</span><span class="tag-col-title">未分类</span>' +
     '<span class="tag-col-count" id="cnt-untagged">' + untagged.length + '</span></div>' +
     '<div class="tag-column-body" data-l1="" ' +
@@ -334,7 +331,6 @@ function tagRenderColumns() {
   if (untagged.length === 0 && tagState.lines.length > 0) html += '<div class="tag-column-empty">所有词条已分类 ✓</div>';
   html += '</div></div>';
   container.innerHTML = html;
-  tagUpdateColumnSelectAllStates();
   // 如果分类标签面板处于展开状态,同步刷新
   var catPanel = document.getElementById('tagCatPanel');
   if (catPanel && catPanel.classList.contains('visible')) tagRenderCatPanel();
@@ -410,12 +406,10 @@ function tagUpdateCounts() {
 function tagRenderCard(l) {
   var cat = l.tag_l1 ? getEnabledSchema()[l.tag_l1] : null;
   var bc = cat ? cat.color : '#555';
-  var checkedAttr = tagState.selectedIndices.has(l.index) ? ' checked' : '';
   return '<div class="tag-card" draggable="true" data-index="' + l.index + '" data-l1="' + escHtml(l.tag_l1 || '') + '" ' +
     'ondragstart="tagCardDragStart(event)" ondragend="tagCardDragEnd(event)" ' +
     'style="border-left:3px solid ' + bc + '">' +
     '<div class="tag-card-row1">' +
-      '<input type="checkbox" class="tag-card-check" data-index="' + l.index + '"' + checkedAttr + ' onchange="tagToggleSelect(' + l.index + ', this.checked)" title="勾选后导入翻译">' +
       '<span class="tag-card-num">#' + (l.index+1) + '</span>' +
       '<span class="tag-card-orig">' + escHtml(l.original) + '</span>' +
       '<span class="tag-card-actions"><button class="btn btn-sm" onclick="tagEditCategory(' + l.index + ')">✏️</button></span>' +
@@ -426,52 +420,11 @@ function tagRenderCard(l) {
     '</div></div>';
 }
 
-// ── 卡片选中/全选 ──
-function tagToggleSelect(index, checked) {
-  if (checked) tagState.selectedIndices.add(index);
-  else tagState.selectedIndices.delete(index);
-  tagUpdateColumnSelectAllStates();
-  tagBtnState();
-}
-
-// ── 列头全选/状态同步 ──
-function tagSelectAllInColumn(l1, checked) {
-  var lines = tagState.lines.filter(function(l) { return (l.tag_l1 || '') === l1; });
-  lines.forEach(function(l) {
-    if (checked) tagState.selectedIndices.add(l.index);
-    else tagState.selectedIndices.delete(l.index);
-  });
-  document.querySelectorAll('.tag-card-check').forEach(function(cb) {
-    var idx = parseInt(cb.dataset.index);
-    cb.checked = tagState.selectedIndices.has(idx);
-  });
-  tagUpdateColumnSelectAllStates();
-  tagBtnState();
-}
-
-function tagUpdateColumnSelectAllStates() {
-  document.querySelectorAll('.tag-column').forEach(function(col) {
-    var l1 = col.dataset.l1;
-    var lines = tagState.lines.filter(function(l) { return (l.tag_l1 || '') === l1; });
-    var total = lines.length;
-    var selected = lines.filter(function(l) { return tagState.selectedIndices.has(l.index); }).length;
-    var chk = col.querySelector('.tag-column-select-all');
-    if (chk) {
-      chk.checked = (total > 0 && selected === total);
-      chk.indeterminate = (selected > 0 && selected < total);
-    }
-  });
-}
 
 // ── 导入到翻译页(按分类分组,去重) ──
 function tagSendToTranslate() {
-  if (tagState.selectedIndices.size === 0) { showToast('请先勾选要导入的条目'); return; }
-  var selectedLines = [];
-  tagState.selectedIndices.forEach(function(idx) {
-    var line = tagState.lines[idx];
-    if (line) selectedLines.push(line);
-  });
-  if (selectedLines.length === 0) { showToast('没有有效条目可导入'); return; }
+  var selectedLines = tagState.lines.filter(function(l){ return l.tag_l1; });
+  if (selectedLines.length === 0) { showToast('没有已分类的条目可导入'); return; }
   if (typeof state === 'undefined') { showToast('翻译页未初始化'); return; }
 
   // 按 tag_l1 分组
@@ -529,7 +482,6 @@ function tagSendToTranslate() {
   state.translateStarted = false;
   $('translateHint').style.display = 'none';
 
-  tagState.selectedIndices.clear();
   tagRenderColumns();
   tagBtnState();
   showToast('已导入 ' + totalAdded + ' 行到翻译页(' + fileNames.length + ' 个分类)');
@@ -809,7 +761,7 @@ function tagUpdateTagStartButton() {
 
 function tagClearAll() {
   if (tagState.lines.length===0) return;
-  tagState.lines=[]; tagState.files=[]; tagState.fileNames=[]; tagState.query=''; tagState.selectedIndices.clear(); tagState.tagStarted=false;
+  tagState.lines=[]; tagState.files=[]; tagState.fileNames=[]; tagState.query=''; tagState.tagStarted=false;
   document.getElementById('tagSearch').value='';
   document.getElementById('tagManualInput').value='';
   tagRenderFileList(); tagRenderPreview(); tagRenderColumns();
@@ -1092,9 +1044,8 @@ function tagBtnState() {
   var has = tagState.lines.length > 0;
   document.getElementById('tagBtnClear').disabled = !has;
   document.getElementById('tagBtnExport').disabled = !tagState.lines.some(function(l){return l.tag_l1;});
-  var hasSelected = tagState.selectedIndices.size > 0;
   var importBtn = document.getElementById('tagBtnImport');
-  if (importBtn) importBtn.disabled = !hasSelected || (typeof state !== 'undefined' && state.translating);
+  if (importBtn) importBtn.disabled = (typeof state !== 'undefined' && state.translating);
   tagUpdateTagStartButton();
 }
 
@@ -1691,9 +1642,7 @@ function tagInit() {
   _initTagStrategy();
   // 选中状态变化时更新按钮
   document.addEventListener('change', function(e) {
-    if (e.target.classList.contains('tag-card-check') || e.target.classList.contains('tag-column-select-all')) {
-      tagBtnState();
-    }
+    // (checkbox listener removed)
   });
   // 点击外部关闭标签搜索下拉框
   document.addEventListener('click', function(e) {
@@ -1755,16 +1704,13 @@ window.tagRenderColumns = tagRenderColumns;
 window.tagRenderFileList = tagRenderFileList;
 window.tagRenderPreview = tagRenderPreview;
 window.tagRenderStrategyPresets = tagRenderStrategyPresets;
-window.tagSelectAllInColumn = tagSelectAllInColumn;
 window.tagSendToTranslate = tagSendToTranslate;
 window.tagStart = tagStart;
 window.tagStop = tagStop;
 window.tagToggleCatPanel = tagToggleCatPanel;
 window.tagToggleCollapse = tagToggleCollapse;
-window.tagToggleSelect = tagToggleSelect;
 window.tagToggleStrategy = tagToggleStrategy;
 window.tagTriggerDownload = tagTriggerDownload;
-window.tagUpdateColumnSelectAllStates = tagUpdateColumnSelectAllStates;
 window.tagUpdateCounts = tagUpdateCounts;
 window.tagUpdateOneCard = tagUpdateOneCard;
 window.tagUpdateTagStartButton = tagUpdateTagStartButton;
