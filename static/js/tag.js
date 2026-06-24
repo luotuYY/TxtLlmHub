@@ -797,8 +797,8 @@ async function _tagRetagOnDrop(line, targetL1) {
       tagLog('\u2717 \u91cd\u5206\u8bcd\u5931\u8d25: HTTP ' + r.status + ' "' + shortText + '"', 'err');
     } else {
       var text = await r.text();
+      tagLog('  重分词 API 返回: ' + text.substring(0, 200));
       var jsonLines = text.trim().split('\n');
-      // Parse the last valid result line
       for (var li = jsonLines.length - 1; li >= 0; li--) {
         var t = jsonLines[li].trim(); if (!t) continue;
         try {
@@ -807,16 +807,22 @@ async function _tagRetagOnDrop(line, targetL1) {
             tagLog('\u2717 \u91cd\u5206\u8bcd\u5931\u8d25 "' + shortText + '": ' + res.error, 'err');
             break;
           }
-          if (res.tag_l2 && cat.subs.indexOf(res.tag_l2) !== -1) {
-            line.tag_l2 = res.tag_l2;
-            line.confidence = res.confidence || 0;
-            ok = true;
-            tagLog('\u2713 \u91cd\u5206\u8bcd\u6210\u529f "' + shortText + '" \u2192 ' + targetL1 + '/' + res.tag_l2 + ' (' + Math.round((res.confidence||0)*100) + '%)', 'ok');
-            break;
+          var l2 = (res.tag_l2 || '').trim();
+          if (l2) {
+            // Trim and do indexOf on subs (both sides trimmed)
+            var matched = cat.subs.some(function(s) { return s.trim() === l2; });
+            if (matched) {
+              line.tag_l2 = l2;
+              line.confidence = res.confidence || 0;
+              ok = true;
+              tagLog('\u2713 \u91cd\u5206\u8bcd\u6210\u529f "' + shortText + '" \u2192 ' + targetL1 + '/' + l2 + ' (' + Math.round((res.confidence||0)*100) + '%)', 'ok');
+              break;
+            }
           }
         } catch (e) {}
       }
-      if (!ok) tagLog('\u26a0 \u91cd\u5206\u8bcd\u672a\u5339\u914d\u5b50\u7c7b "' + shortText + '"\u2192\u4fdd\u6301\u9ed8\u8ba4 ' + targetL1 + '/' + line.tag_l2);
+      if (!ok && res && res.tag_l2) tagLog('\u26a0 \u91cd\u5206\u8bcd\u672a\u5339\u914d\u5b50\u7c7b "' + shortText + '": \u8fd4\u56de="' + (res.tag_l2||'').trim() + '", \u671f\u671b=' + cat.subs.join('|') + '\u2192\u4fdd\u6301\u9ed8\u8ba4 ' + targetL1 + '/' + line.tag_l2);
+      else if (!ok) tagLog('\u26a0 \u91cd\u5206\u8bcd\u65e0\u6709\u6548\u5b50\u7c7b\u8f93\u51fa "' + shortText + '"\u2192\u4fdd\u6301\u9ed8\u8ba4 ' + targetL1 + '/' + line.tag_l2);
     }
   } catch (e) {
     tagLog('\u2717 \u91cd\u5206\u8bcd\u5f02\u5e38 "' + shortText + '": ' + (e.message || e), 'err');
