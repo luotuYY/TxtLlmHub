@@ -18,6 +18,8 @@ var tagState = {
 };
 
 // ── 分类体系(动态 schema,前端可自定义) ──
+var DEFAULT_SUB_POOL = ['UI文本', '菜单/按钮', '属性/状态', '物品/装备', '技能/招式', '系统提示', 'Mod/插件', '代码标识符', '对话/台词', '旁白/叙述', '情感/语气', '俚语/口语', '描述/刻画', '幽默/讽刺', '严肃/正式'];
+
 var DEFAULT_TAG_SCHEMA = {
   '硬术语': {
     color: '#4fc3f7', icon: '🔧',
@@ -63,7 +65,7 @@ function getSubPool() {
       if (Array.isArray(arr)) return arr;
     }
   } catch (e) { /* ignore */ }
-  return [];
+  return DEFAULT_SUB_POOL.slice();
 }
 function saveSubPool(pool) {
   localStorage.setItem('tllmh_sub_pool', JSON.stringify(pool));
@@ -1043,7 +1045,7 @@ function tagOpenAdmin() {
           '<div class="tag-admin-right">' +
             '<div style="font-size:0.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px">二级类目池</div>' +
             '<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:6px">拖入左侧分配 | 双击编辑 | 仅此处可删除</div>' +
-            '<div class="tag-admin-pool" id="tagAdminPool" ondragover="event.preventDefault()"></div>' +
+            '<div class="tag-admin-pool" id="tagAdminPool" ondragover="event.preventDefault()" ondrop="tagAdminPoolDrop(event)"></div>' +
             '<button class="btn btn-sm" onclick="tagAdminAddToPool()" style="margin-top:8px;width:100%">+ 添加二级类目</button>' +
           '</div>' +
         '</div>' +
@@ -1087,7 +1089,9 @@ function tagOpenAdmin() {
         '</div>' +
         '<div class="tag-admin-subs">';
     (cat.subs || []).forEach(function(sub) {
-      leftHtml += '<span class="tag-admin-sub-wrap">' +
+      leftHtml += '<span class="tag-admin-sub-wrap" draggable="true"' +
+        ' ondragstart="tagAdminSubDragStart(event, this)"' +
+        ' ondragend="tagAdminSubDragEnd(event, this)">' +
         '<input class="tag-admin-sub" value="' + escHtml(sub) + '"' +
           ' ondblclick="this.readOnly=false;this.focus();this.select()"' +
           ' onblur="this.readOnly=true"' +
@@ -1125,8 +1129,11 @@ function tagAdminAddSub(btn) {
   var wrapper = btn.closest('.tag-admin-group').querySelector('.tag-admin-subs');
   var span = document.createElement('span');
   span.className = 'tag-admin-sub-wrap';
+  span.draggable = true;
+  span.setAttribute('ondragstart', 'tagAdminSubDragStart(event, this)');
+  span.setAttribute('ondragend', 'tagAdminSubDragEnd(event, this)');
   span.innerHTML = '<input class="tag-admin-sub" placeholder="新子项" value="">' +
-    '<span class="tag-admin-sub-del" onclick="this.parentElement.remove()">&times;</span>';
+    '<span class="tag-admin-sub-del" onclick="tagAdminRemoveSub(this)" title="移回二级池">&times;</span>';
   wrapper.appendChild(span);
   span.querySelector('input').focus();
 }
@@ -1179,6 +1186,7 @@ function tagAdminRemoveSub(el) {
 // ── 池子拖拽事件 ──
 function tagAdminPoolDragStart(e, el) {
   e.dataTransfer.setData('text/plain', el.querySelector('.tag-admin-pool-text').textContent);
+  e.dataTransfer.setData('source', 'pool');
   e.dataTransfer.effectAllowed = 'move'; el.classList.add('drag-start');
   setTimeout(function() { if (el) el.classList.remove('drag-start'); }, 0);
 }
@@ -1191,12 +1199,35 @@ function tagAdminDrop(e, group) {
   e.preventDefault(); group.classList.remove('drag-over');
   var name = e.dataTransfer.getData('text/plain');
   if (!name) return;
-  var schema = getTagSchema(); var assigned = false;
-  Object.keys(schema).forEach(function(l1) { if ((schema[l1].subs || []).indexOf(name) !== -1) assigned = true; });
-  if (assigned) { showToast('"' + name + '" 已在其他一级类目中'); return; }
-  var pool = getSubPool(); var idx = pool.indexOf(name); if (idx === -1) return;
-  pool.splice(idx, 1); saveSubPool(pool);
-  var subHtml = '<span class="tag-admin-sub-wrap">' +
+  var isSub = e.dataTransfer.getData('source') === 'sub';
+  
+  // 不允许在同一类目内重复
+  var existingSubs = group.querySelectorAll('.tag-admin-sub');
+  for (var i = 0; i < existingSubs.length; i++) {
+    if ((existingSubs[i].value || existingSubs[i].defaultValue || '').trim() === name) {
+      _refreshPool(); return;
+    }
+  }
+  
+  if (isSub) {
+    // 左侧子项拖动: 从源类目中移除
+    var allWraps = document.querySelectorAll('.tag-admin-sub-wrap');
+    allWraps.forEach(function(wrap) {
+      var input = wrap.querySelector('.tag-admin-sub');
+      var subName = (input.value || input.defaultValue || '').trim();
+      if (subName === name) { wrap.remove(); }
+    });
+  } else {
+    // 池子拖动: 从池中移除
+    var pool = getSubPool(); var idx = pool.indexOf(name);
+    if (idx !== -1) { pool.splice(idx, 1); saveSubPool(pool); }
+    else return;
+  }
+  
+  // 添加到目标类目
+  var subHtml = '<span class="tag-admin-sub-wrap" draggable="true"' +
+    ' ondragstart="tagAdminSubDragStart(event, this)"' +
+    ' ondragend="tagAdminSubDragEnd(event, this)">' +
     '<input class="tag-admin-sub" value="' + escHtml(name) + '" ondblclick="this.readOnly=false;this.focus();this.select()" onblur="this.readOnly=true" readonly>' +
     '<span class="tag-admin-sub-del" onclick="tagAdminRemoveSub(this)" title="移回二级池">&times;</span>' +
   '</span>';
@@ -1248,6 +1279,36 @@ function tagAdminAddToPool() {
   Object.keys(schema).forEach(function(l1) { if ((schema[l1].subs || []).indexOf(name) !== -1) assigned = true; });
   if (assigned) { showToast('该名称已在分类中使用'); return; }
   pool.push(name); saveSubPool(pool); _refreshPool();
+}
+
+// ── 左侧子项拖拽 ──
+function tagAdminSubDragStart(e, el) {
+  var input = el.querySelector('.tag-admin-sub');
+  var name = (input.value || input.defaultValue || '').trim();
+  e.dataTransfer.setData('text/plain', name);
+  e.dataTransfer.setData('source', 'sub');
+  e.dataTransfer.effectAllowed = 'move';
+  el.classList.add('drag-start');
+}
+function tagAdminSubDragEnd(e, el) { el.classList.remove('drag-start'); }
+
+// ── 池子接收拖入的子项 ──
+function tagAdminPoolDrop(e) {
+  e.preventDefault();
+  var name = e.dataTransfer.getData('text/plain');
+  var source = e.dataTransfer.getData('source');
+  if (!name || source !== 'sub') return;
+  // 从左侧DOM移除
+  var wraps = document.querySelectorAll('.tag-admin-sub-wrap');
+  wraps.forEach(function(wrap) {
+    var input = wrap.querySelector('.tag-admin-sub');
+    var subName = (input.value || input.defaultValue || '').trim();
+    if (subName === name) { wrap.remove(); }
+  });
+  // 加入池子
+  var pool = getSubPool();
+  if (pool.indexOf(name) === -1) { pool.push(name); saveSubPool(pool); }
+  _refreshPool();
 }
 
 // ── 刷新右侧池子 DOM ──
@@ -1441,4 +1502,8 @@ window.tagUpdateOneCard = tagUpdateOneCard;
 window.tagUpdateTagStartButton = tagUpdateTagStartButton;
 
 // ── Module export
+window.tagAdminSubDragStart = tagAdminSubDragStart;
+window.tagAdminSubDragEnd = tagAdminSubDragEnd;
+window.tagAdminPoolDrop = tagAdminPoolDrop;
+
 export {};
