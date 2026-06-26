@@ -17,7 +17,7 @@ import { processFiles, deleteFile, toggleFile, deletePreviewLine,
 import { renderInternal, getCheckedFileNames, renderPreview, renderCompare, updateSearchUI,
           updateCompareRow, updatePreviewLine, updatePreviewSelectAllVisibility,
           getCheckedPreviewIndices, getCheckedRows, onPreviewCheck, onCompareCheck,
-          updateSelectAllPreview, updateSelectAllCompare, toggleSelectAllCompare } from './render.js';
+          updateSelectAllPreview, updateSelectAllCompare, toggleSelectAllCompare, toggleSelectAllPreview } from './render.js';
 import { setProvider, setMode, saveModeParams, saveApiConfig, testApiConnection,
           onThinkingChange, togglePrompt, resetSystemPrompt,
           togglePolishStrategy, savePolishStrategy, resetPolishStrategy,
