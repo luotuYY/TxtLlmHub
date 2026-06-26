@@ -2192,27 +2192,31 @@ function tagInit() {
       else if (action === 'tag-admin-pool-chip') tagAdminPoolDragEnd(e, el);
     });
     tagPage.addEventListener('dragover', function(e) {
-      var el = e.target.closest('[data-action]');
-      if (!el) return;
-      var action = el.dataset.action;
-      if (action === 'tag-column-body') { e.preventDefault(); tagDragOver(e, el); }
-      else if (action === 'tag-admin-group') { e.preventDefault(); tagAdminDragOver(e, el); }
+      // Find the drop container (column body, admin group, or pool)
+      var col = e.target.closest('.tag-column-body');
+      var grp = e.target.closest('.tag-admin-group');
+      var pool = e.target.closest('.tag-admin-pool');
+      if (col) { e.preventDefault(); tagDragOver(e, col); }
+      else if (grp) { e.preventDefault(); tagAdminDragOver(e, grp); }
+      else if (pool) { e.preventDefault(); }
     });
     tagPage.addEventListener('dragleave', function(e) {
-      var el = e.target.closest('[data-action]');
-      if (!el) return;
-      var action = el.dataset.action;
-      if (action === 'tag-column-body') tagDragLeave(e, el);
-      else if (action === 'tag-admin-group') tagAdminDragLeave(e, el);
+      var col = e.target.closest('.tag-column-body');
+      var grp = e.target.closest('.tag-admin-group');
+      if (col) tagDragLeave(e, col);
+      else if (grp) tagAdminDragLeave(e, grp);
     });
     tagPage.addEventListener('drop', function(e) {
       e.preventDefault();
-      var el = e.target.closest('[data-action]');
-      if (!el) return;
-      var action = el.dataset.action;
-      if (action === 'tag-column-body') tagDrop(e, el);
-      else if (action === 'tag-admin-pool-drop') tagAdminPoolDrop(e);
-      else if (action === 'tag-admin-group') tagAdminDrop(e, el);
+      var col = e.target.closest('.tag-column-body');
+      var grp = e.target.closest('.tag-admin-group');
+      if (col) tagDrop(e, col);
+      else if (grp) tagAdminDrop(e, grp);
+      else {
+        // Pool drop
+        var poolEl = e.target.closest('.tag-admin-pool');
+        if (poolEl) tagAdminPoolDrop(e);
+      }
     });
   }
 
