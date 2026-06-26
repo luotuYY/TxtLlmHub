@@ -75,6 +75,8 @@ async function processFiles(files) {
 
     renderFileList();
     state.translateStarted = false;
+    state.previewPage = 1;
+    state.comparePage = 1;
     updateTranslateAllButton();
     $('btnRetryFailed').disabled = true;
     $('btnExport').disabled = true;
@@ -142,6 +144,8 @@ async function loadManualInput() {
       state.abort = false;
       state.translating = false;
       state.translateStarted = false;
+    state.previewPage = 1;
+    state.comparePage = 1;
       state.previewChecked.clear();
       state.previewQuery = '';
       state.compareQuery = '';
@@ -540,6 +544,8 @@ function resetSourceInput() {
   renderPreview();
   renderCompare();
   state.translateStarted = false;
+    state.previewPage = 1;
+    state.comparePage = 1;
   updateTranslateAllButton();
   $('btnRetryFailed').disabled = true;
   $('btnClearAll').disabled = true;

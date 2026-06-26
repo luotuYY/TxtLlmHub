@@ -266,7 +266,10 @@ function tagRenderPreview() {
   html += '</div>';
   html += _renderPagination(total, perPage, tagState.previewPage, 'tag-preview');
   document.getElementById('tagPreview').innerHTML = html;
-  _bindPagination('tagPreview', 'tag-preview');
+  _bindPagination('tagPreview', 'tag-preview', {
+      onPage: function(p) { tagState.previewPage = p; tagRenderPreview(); },
+      onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.columnsPage = 1; tagRenderPreview(); tagRenderColumns(); }
+    });
   document.getElementById('tagPreviewCount').textContent = q ? total + ' 条匹配' : filtered.length + ' 行';
 }
 
@@ -338,7 +341,10 @@ function tagRenderColumns() {
     var pgDiv = document.createElement('div');
     pgDiv.innerHTML = pgHtml;
     container.parentElement.appendChild(pgDiv.firstChild);
-    _bindPagination(container.parentElement.id || 'tagColumns', 'tag-columns');
+    _bindPagination(container.parentElement.id || 'tagColumns', 'tag-columns', {
+      onPage: function(p) { tagState.columnsPage = p; tagRenderColumns(); },
+      onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.columnsPage = 1; tagRenderPreview(); tagRenderColumns(); }
+    });
   }
   // 如果分类标签面板处于展开状态,同步刷新
   var catPanel = document.getElementById('tagCatPanel');

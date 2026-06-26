@@ -33,24 +33,26 @@ function renderPreview() {
     return !l.file || checkedFiles.indexOf(l.file) >= 0;
   });
   var lines = filtered.slice();
-  var limit = state.previewRowLimit || 2000;
-  if (limit > 0 && lines.length > limit) {
-    lines = lines.slice(0, limit);
-  }
-  var shown = 0;
   if (q) {
     lines = lines.filter(function (l) {
       return matches(l.original, q) || matches(l.translation, q) || matches(l.new_translation, q);
     });
   }
-  shown = lines.length;
+  var total = lines.length;
+  var perPage = state.previewRowLimit || 200;
+  var totalPages = Math.max(1, Math.ceil(total / perPage));
+  if (state.previewPage > totalPages) state.previewPage = totalPages;
+  if (state.previewPage < 1) state.previewPage = 1;
+  var start = (state.previewPage - 1) * perPage;
+  var pageLines = lines.slice(start, start + perPage);
+
   if (state.lines.length === 0) {
     $('cardPreview').innerHTML = '<div class="empty-state">请先上传 txt 文件</div>';
-  } else if (q && shown === 0) {
+  } else if (q && total === 0) {
     $('cardPreview').innerHTML = '<div class="empty-state">无匹配结果</div>';
   } else {
     var previewHtml = '<div class="line-list">';
-    lines.forEach(function (l) {
+    pageLines.forEach(function (l) {
       previewHtml += '<div class="line-item">' +
         '<span class="line-num">' + (l.index + 1) + '</span>' +
         '<span class="line-text">' +
@@ -59,8 +61,8 @@ function renderPreview() {
           (l.new_translation ? '<span class="sep">\u2192</span><span style="color:var(--green)">' + hl(l.new_translation) + '</span>' : '') +
         '</span>' +
         '<span class="line-actions">' +
-          '<button class="btn" data-action="delete-preview-line" data-index="' + l.index + '" title="删除此条目">🗑</button>' +
-          '<button class="btn" data-action="translate-one" data-index="' + l.index + '" ' + (state.translating ? 'disabled' : '') + '>译</button>' +
+          '<button class="btn" data-action="delete-preview-line" data-index="' + l.index + '" title="删除此条目">\uD83D\uDDD1</button>' +
+          '<button class="btn" data-action="translate-one" data-index="' + l.index + '" ' + (state.translating ? 'disabled' : '') + '>\u8BD1</button>' +
         '</span>' +
         '<span class="line-check-wrap">' +
           '<input type="checkbox" class="preview-check" data-index="' + l.index + '" data-action="preview-check" ' + (state.previewChecked.has(l.index) ? 'checked' : '') + '>' +
@@ -68,10 +70,15 @@ function renderPreview() {
       '</div>';
     });
     previewHtml += '</div>';
+    previewHtml += _renderPagination(total, perPage, state.previewPage, 'preview');
     $('cardPreview').innerHTML = previewHtml;
+    _bindPagination('cardPreview', 'preview', {
+      onPage: function(p) { state.previewPage = p; renderPreview(); },
+      onRowsPerPage: function(v) { state.previewRowLimit = v; state.previewPage = 1; state.comparePage = 1; renderPreview(); renderCompare(); }
+    });
   }
   $('previewSearchCount').textContent = q
-    ? shown + ' 条匹配'
+    ? total + ' 条匹配'
     : filtered.length + ' 行';
   updatePreviewSelectAllVisibility();
   updateSelectAllPreview();
@@ -180,7 +187,10 @@ function renderCompare() {
     compareHtml += '</tbody></table>';
     compareHtml += _renderPagination(total, perPage, state.comparePage, 'compare');
     $('cardCompare').innerHTML = compareHtml;
-    _bindPagination('cardCompare', 'compare');
+    _bindPagination('cardCompare', 'compare', {
+      onPage: function(p) { state.comparePage = p; renderCompare(); },
+      onRowsPerPage: function(v) { state.previewRowLimit = v; state.previewPage = 1; state.comparePage = 1; renderPreview(); renderCompare(); }
+    });
   }
   if (q) $('compareSearchCount').textContent = shown + ' 条匹配';
   updateSelectAllCompare();
@@ -339,19 +349,14 @@ function _calcPageRange(cur, total) {
   return pages;
 }
 
-function _bindPagination(containerId, pageKey) {
+function _bindPagination(containerId, pageKey, callbacks) {
   var container = document.getElementById(containerId);
   if (!container) return;
   container.querySelectorAll('button[data-pg="' + pageKey + '"]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var page = parseInt(btn.dataset.page);
       if (page < 1) return;
-      if (pageKey === 'preview') { state.previewPage = page; renderPreview(); }
-      else if (pageKey === 'compare') { state.comparePage = page; renderCompare(); }
-      else if (pageKey === 'tag-preview') { tagState.previewPage = page; tagRenderPreview(); }
-      else if (pageKey === 'tag-columns') { tagState.columnsPage = page; tagRenderColumns(); }
-      else if (pageKey === 'dedup') { dedupState.currentPage = page; renderGroups(); }
-      // 滚动到容器顶部
+      if (callbacks && callbacks.onPage) callbacks.onPage(page);
       var el = document.getElementById(containerId);
       if (el) el.scrollTop = 0;
     });
@@ -360,23 +365,7 @@ function _bindPagination(containerId, pageKey) {
   if (sel) {
     sel.addEventListener('change', function () {
       var val = parseInt(sel.value) || 200;
-      if (pageKey === 'preview' || pageKey === 'compare') {
-        state.previewRowLimit = val;
-        state.previewPage = 1;
-        state.comparePage = 1;
-        renderPreview();
-        renderCompare();
-      } else if (pageKey === 'tag-preview' || pageKey === 'tag-columns') {
-        tagState.previewRowLimit = val;
-        tagState.previewPage = 1;
-        tagState.columnsPage = 1;
-        tagRenderPreview();
-        tagRenderColumns();
-      } else if (pageKey === 'dedup') {
-        dedupState.rowsPerPage = val;
-        dedupState.currentPage = 1;
-        renderGroups();
-      }
+      if (callbacks && callbacks.onRowsPerPage) callbacks.onRowsPerPage(val);
     });
   }
 }
