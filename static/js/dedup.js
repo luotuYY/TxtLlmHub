@@ -913,7 +913,6 @@ async function init() {
           resetInputDefault(dedupConcurrencyEl, saveDedupParams);
         });
       }
-      });
     }
 }
 
