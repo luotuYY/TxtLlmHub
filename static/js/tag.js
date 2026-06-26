@@ -21,7 +21,7 @@ var tagState = {
   query: '',
   previewRowLimit: 200,
   previewPage: 1,
-  columnsPage: 1,
+  colPages: {},       // {colId: pageNum} 每列独立页码
   tagStarted: false,  // 是否过分词任务(用于区分「开始」和「继续」)
   _tagCounts: null,  // 缓存分类计数，避免每次O(n) filter
 };
@@ -268,7 +268,7 @@ function tagRenderPreview() {
   document.getElementById('tagPreview').innerHTML = html;
   _bindPagination('tagPreview', 'tag-preview', {
       onPage: function(p) { tagState.previewPage = p; tagRenderPreview(); },
-      onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.columnsPage = 1; tagRenderPreview(); tagRenderColumns(); }
+      onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.colPages = {}; tagRenderPreview(); tagRenderColumns(); }
     });
   document.getElementById('tagPreviewCount').textContent = q ? total + ' 条匹配' : filtered.length + ' 行';
 }
@@ -281,7 +281,6 @@ function tagRenderColumns() {
   var schema = getEnabledSchema();
   var validL1 = Object.keys(schema);
   var perPage = tagState.previewRowLimit || 200;
-  var colPage = tagState.columnsPage || 1;
   // 清洗数据：将不属于当前 schema 的词条重置为未分类
   tagState.lines.forEach(function(l) {
     if (l.tag_l1 && validL1.indexOf(l.tag_l1) === -1) {
@@ -297,84 +296,83 @@ function tagRenderColumns() {
   });
   // 校验后每次渲染都重建计数缓存（与渲染本身 O(n) 相比开销可忽略）
   _initTagCounts();
-  // 计算各列实际条目数，用于分页条
-  var colCounts = {};
-  var maxColItems = 0;
-  Object.keys(schema).forEach(function(l1) {
-    var cnt = tagState.lines.filter(function(l) { return l.tag_l1 === l1; }).length;
-    colCounts[l1] = cnt;
-    if (cnt > maxColItems) maxColItems = cnt;
-  });
-  var untaggedCount = tagState.lines.filter(function(l) { return !l.tag_l1; }).length;
-  if (untaggedCount > maxColItems) maxColItems = untaggedCount;
-
-  // 修正 colPage 不超过最大列的实际页数
-  var maxTotalPages = Math.max(1, Math.ceil(maxColItems / perPage));
-  if (colPage > maxTotalPages) colPage = maxTotalPages;
-  tagState.columnsPage = colPage;
-
   var html = '';
   Object.keys(schema).forEach(function(l1) {
     var cat = schema[l1];
     var items = tagState.lines.filter(function(l) { return l.tag_l1 === l1; });
-    var cs = (colPage - 1) * perPage;
-    var shown = items.slice(cs, cs + perPage);
+    var colId = 'tag-col-' + l1;
+    var cp = _getColPage(colId, items.length, perPage);
+    var shown = items.slice((cp - 1) * perPage, cp * perPage);
     html += '<div class="tag-column" data-l1="' + l1 + '">' +
       '<div class="tag-column-header" style="border-left:3px solid ' + cat.color + '">' +
       '<span class="tag-col-icon">' + cat.icon + '</span>' +
       '<span class="tag-col-title">' + escHtml(l1) + '</span>' +
       '<span class="tag-col-count" id="cnt-' + l1 + '">' + items.length + '</span></div>' +
-      '<div class="tag-column-body" data-l1="' + l1 + '" ' +
-      'data-action="tag-column-body">';
+      '<div class="tag-column-body" data-l1="' + l1 + '" data-action="tag-column-body">';
     shown.forEach(function(l) { html += tagRenderCard(l); });
     if (items.length === 0) html += '<div class="tag-column-empty">拖入词条或运行分词</div>';
-    html += '</div></div>';
+    html += '</div>';
+    html += _renderColPagination(colId, items.length, perPage);
+    html += '</div>';
   });
   var untagged = tagState.lines.filter(function(l) { return !l.tag_l1; });
-  var ucs = (colPage - 1) * perPage;
-  var unShown = untagged.slice(ucs, ucs + perPage);
+  var untaggedColId = 'tag-col-__untagged';
+  var ucp = _getColPage(untaggedColId, untagged.length, perPage);
+  var unShown = untagged.slice((ucp - 1) * perPage, ucp * perPage);
   html += '<div class="tag-column tag-column-untagged">' +
     '<div class="tag-column-header" style="border-left:3px solid #888">' +
     '<span class="tag-col-icon">📋</span><span class="tag-col-title">未分类</span>' +
     '<span class="tag-col-count" id="cnt-untagged">' + untagged.length + '</span></div>' +
-    '<div class="tag-column-body" data-l1="" ' +
-    'data-action="tag-column-body">';
+    '<div class="tag-column-body" data-l1="" data-action="tag-column-body">';
   unShown.forEach(function(l) { html += tagRenderCard(l); });
   if (untagged.length === 0 && tagState.lines.length > 0) html += '<div class="tag-column-empty">所有词条已分类 ✓</div>';
-  html += '</div></div>';
+  html += '</div>';
+  html += _renderColPagination(untaggedColId, untagged.length, perPage);
+  html += '</div>';
   container.innerHTML = html;
-  // 分页控件
-  _ensureTagPagination(container);
+  // 绑定各列分页事件
+  container.querySelectorAll('.tag-column').forEach(function(colEl) {
+    _bindColPagination(colEl);
+  });
   // 如果分类标签面板处于展开状态,同步刷新
   var catPanel = document.getElementById('tagCatPanel');
   if (catPanel && catPanel.classList.contains('visible')) tagRenderCatPanel();
 }
 
-// ── 确保分页条存在（流式过程中按需创建，已存在则跳过） ──
-function _ensureTagPagination(container) {
-  if (!container) container = document.getElementById('tagColumns');
-  if (!container) return;
-  var parent = container.parentElement;
-  if (!parent) return;
-  // 已存在则不重复创建（tagRenderColumns 全量渲染时会处理更新）
-  if (parent.querySelector('.pagination-bar')) return;
-  var perPage = tagState.previewRowLimit || 200;
-  var schema = getEnabledSchema();
-  var maxColItems = 0;
-  Object.keys(schema).forEach(function(l1) {
-    var cnt = tagState.lines.filter(function(l) { return l.tag_l1 === l1; }).length;
-    if (cnt > maxColItems) maxColItems = cnt;
-  });
-  var untaggedCnt = tagState.lines.filter(function(l) { return !l.tag_l1; }).length;
-  if (untaggedCnt > maxColItems) maxColItems = untaggedCnt;
-  if (maxColItems <= perPage) return;
-  var maxTotalPages = Math.max(1, Math.ceil(maxColItems / perPage));
-  var colPage = tagState.columnsPage || 1;
-  if (colPage > maxTotalPages) { colPage = maxTotalPages; tagState.columnsPage = colPage; }
-  container.insertAdjacentHTML('afterend', _renderPagination(maxColItems, perPage, colPage, 'tag-columns'));
-  _bindPagination(parent.id, 'tag-columns', {
-    onPage: function(p) { tagState.columnsPage = p; tagRenderColumns(); },
-    onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.columnsPage = 1; tagRenderPreview(); tagRenderColumns(); }
+// ── 分页状态管理 ──
+function _getColPage(colId, total, perPage) {
+  var p = tagState.colPages[colId] || 1;
+  var maxP = Math.max(1, Math.ceil(total / perPage));
+  if (p > maxP) p = maxP;
+  tagState.colPages[colId] = p;
+  return p;
+}
+
+// ── 渲染单列分页条（简洁版：翻页按钮 + 页码信息） ──
+function _renderColPagination(colId, total, perPage) {
+  if (total <= perPage) return '';
+  var totalPages = Math.ceil(total / perPage);
+  var currentPage = _getColPage(colId, total, perPage);
+  var start = (currentPage - 1) * perPage + 1;
+  var end = Math.min(currentPage * perPage, total);
+  var html = '<div class="col-pagination">';
+  html += '<button class="col-pg-btn" data-colpg="' + colId + '" data-page="' + (currentPage - 1) + '"' + (currentPage <= 1 ? ' disabled' : '') + '>&laquo;</button>';
+  html += '<span class="col-pg-info">' + start + '-' + end + ' / ' + total + '</span>';
+  html += '<button class="col-pg-btn" data-colpg="' + colId + '" data-page="' + (currentPage + 1) + '"' + (currentPage >= totalPages ? ' disabled' : '') + '>&raquo;</button>';
+  html += '</div>';
+  return html;
+}
+
+// ── 绑定单列分页事件 ──
+function _bindColPagination(colEl) {
+  colEl.querySelectorAll('.col-pg-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var colId = btn.dataset.colpg;
+      var page = parseInt(btn.dataset.page);
+      if (page < 1) return;
+      tagState.colPages[colId] = page;
+      tagRenderColumns();
+    });
   });
 }
 
@@ -452,9 +450,8 @@ function tagUpdateOneCard(line) {
       if (newCard2) newCard2.setAttribute('data-l1', expectedL1);
     }
   }
-  // 实时更新列头计数 + 流式过程中按需创建分页条
+  // 实时更新列头计数
   tagUpdateCounts();
-  _ensureTagPagination();
 }
 
 // ── 列头计数更新 ──
