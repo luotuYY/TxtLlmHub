@@ -506,6 +506,22 @@ function _backfillUntagged() {
       if (shown.length + 1 >= perPage) break;
     }
   }
+  // 回补后更新分页条总数
+  _refreshColPagination(body);
+}
+
+// ── 刷新指定栏的分页条总数 ──
+function _refreshColPagination(body) {
+  var column = body.closest('.tag-column');
+  if (!column) return;
+  var pgBar = column.querySelector('.col-pagination');
+  if (!pgBar) return;
+  var l1 = body.dataset.l1;
+  var colId = 'tag-col-' + (l1 || '__untagged');
+  var total = body.querySelectorAll('.tag-card').length;
+  var perPage = tagState.previewRowLimit || 200;
+  pgBar.outerHTML = _renderColPagination(colId, total, perPage);
+  _bindColPagination(column);
 }
 
 // ── 列头计数更新 ──
