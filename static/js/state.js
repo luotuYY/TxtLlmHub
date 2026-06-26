@@ -174,11 +174,15 @@ function loadModeParams(mode) {
 }
 
 function getLLMParams() {
+  var tempVal = parseFloat($('temperature').value);
+  var topVal = parseFloat($('top_p').value);
+  var maxVal = parseInt($('max_tokens').value);
+  var repVal = parseFloat($('repetition_penalty').value);
   var p = {
-    temperature: parseFloat($('temperature').value) || 0.3,
-    top_p: parseFloat($('top_p').value) || 0.6,
-    max_tokens: parseInt($('max_tokens').value) || 1024,
-    repetition_penalty: parseFloat($('repetition_penalty').value) || 1.05,
+    temperature: isNaN(tempVal) ? 0.7 : tempVal,
+    top_p: isNaN(topVal) ? 0.6 : topVal,
+    max_tokens: isNaN(maxVal) || maxVal <= 0 ? 1024 : maxVal,
+    repetition_penalty: isNaN(repVal) || repVal < 1 ? 1.05 : repVal,
     system_prompt: $('system_prompt').value.trim() || undefined,
   };
   if (state.translateMode === 'polish') {
@@ -407,6 +411,12 @@ async function loadDefaults() {
     }
   } catch (e) { /* ignore */ }
   loadModeParams(state.translateMode);
+  // 加载持久化的并发数
+  var savedConcurrency = dbGet('tllmh_concurrency');
+  if (savedConcurrency != null) {
+    var concEl = $('concurrency');
+    if (concEl) concEl.value = savedConcurrency;
+  }
   _modeReady = true;
 }
 

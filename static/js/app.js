@@ -6,6 +6,7 @@
 
 
 import { $, escHtml, showToast, log, naturalCompare, fallbackCopy } from './utils.js';
+import { dbGet, dbSet } from './db.js';
 import { state, rebuildIndicesAndCheckboxes, PRESET_PROMPTS, 
           updateTranslateAllButton, updateRetryButton, updateExportCheckedButton,
           getLLMParams, getApiConfig, checkLLM } from './state.js';
@@ -775,6 +776,11 @@ function triggerDownload(filename, fcontent) {
       concurrencyEl.value = '5';
       if (window.getSelection) window.getSelection().removeAllRanges();
       concurrencyEl.blur();
+      dbSet('tllmh_concurrency', '5');
+    });
+    // 持久化并发数
+    concurrencyEl.addEventListener('blur', function() {
+      dbSet('tllmh_concurrency', concurrencyEl.value);
     });
   }
 

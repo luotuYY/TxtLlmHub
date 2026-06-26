@@ -898,6 +898,16 @@ async function init() {
         input.addEventListener('dblclick', function() { resetDedupParamDefault(input); saveDedupParams(); });
       });
     }
+    // 去重页并发数双击重置（不在 .param-row 内）
+    var dedupConcurrencyEl = document.getElementById('dedupConcurrency');
+    if (dedupConcurrencyEl) {
+      dedupConcurrencyEl.addEventListener('dblclick', function() {
+        dedupConcurrencyEl.value = String(DEDUP_DEFAULTS.concurrency);
+        if (window.getSelection) window.getSelection().removeAllRanges();
+        dedupConcurrencyEl.blur();
+        saveDedupParams();
+      });
+    }
 }
 
 
