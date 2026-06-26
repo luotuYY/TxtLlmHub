@@ -173,7 +173,7 @@ function tagRenderFileList() {
     var cnt = tagState.lines.filter(function(l) { return l.file === f.name; }).length;
     html += '<div class="file-entry"><span class="file-name">' + escHtml(f.name) +
       '</span><span class="file-count">' + cnt + ' 行</span>' +
-      '<span class="file-delete" onclick="tagDeleteFile(' + i + ')">🗑</span></div>';
+      '<span class="file-delete" data-action="tag-delete-file" data-index="' + i + '">🗑</span></div>';
   }
   document.getElementById('tagFileInfo').innerHTML = html || '<div class="empty-state">暂无来源文件</div>';
 }
@@ -311,7 +311,7 @@ function tagRenderColumns() {
       '<span class="tag-col-title">' + escHtml(l1) + '</span>' +
       '<span class="tag-col-count" id="cnt-' + l1 + '">' + items.length + '</span></div>' +
       '<div class="tag-column-body" data-l1="' + l1 + '" ' +
-      'ondragover="tagDragOver(event)" ondrop="tagDrop(event)" ondragleave="tagDragLeave(event)">';
+      'data-action="tag-drag-over" data-action="tag-drop" data-action="tag-drag-leave">';
     shown.forEach(function(l) { html += tagRenderCard(l); });
     if (displayLimit > 0 && items.length > displayLimit) html += '<div class="tag-column-empty">…还有 ' + (items.length - displayLimit) + ' 条</div>';
     if (items.length === 0) html += '<div class="tag-column-empty">拖入词条或运行分词</div>';
@@ -325,7 +325,7 @@ function tagRenderColumns() {
     '<span class="tag-col-icon">📋</span><span class="tag-col-title">未分类</span>' +
     '<span class="tag-col-count" id="cnt-untagged">' + untagged.length + '</span></div>' +
     '<div class="tag-column-body" data-l1="" ' +
-    'ondragover="tagDragOver(event)" ondrop="tagDrop(event)" ondragleave="tagDragLeave(event)">';
+    'data-action="tag-drag-over" data-action="tag-drop" data-action="tag-drag-leave">';
   unShown.forEach(function(l) { html += tagRenderCard(l); });
   if (untaggedLimit > 0 && untagged.length > untaggedLimit) html += '<div class="tag-column-empty">…还有 ' + (untagged.length - untaggedLimit) + ' 条</div>';
   if (untagged.length === 0 && tagState.lines.length > 0) html += '<div class="tag-column-empty">所有词条已分类 ✓</div>';
@@ -437,12 +437,12 @@ function tagRenderCard(l) {
   var cat = l.tag_l1 ? getEnabledSchema()[l.tag_l1] : null;
   var bc = cat ? cat.color : '#555';
   return '<div class="tag-card" draggable="true" data-index="' + l.index + '" data-l1="' + escHtml(l.tag_l1 || '') + '" ' +
-    'ondragstart="tagCardDragStart(event)" ondragend="tagCardDragEnd(event)" ' +
+    'data-action="tag-card-drag-start" data-action="tag-card-drag-end" ' +
     'style="border-left:3px solid ' + bc + '">' +
     '<div class="tag-card-row1">' +
       '<span class="tag-card-num">#' + (l.index+1) + '</span>' +
       '<span class="tag-card-orig">' + escHtml(l.original) + '</span>' +
-      '<span class="tag-card-actions"><button class="btn btn-sm" onclick="tagEditCategory(' + l.index + ')">✏️</button></span>' +
+      '<span class="tag-card-actions"><button class="btn btn-sm" data-action="tag-edit-cat" data-index="' + l.index + '">✏️</button></span>' +
     '</div>' +
     (l.translation ? '<div class="tag-card-tran">' + escHtml(l.translation) + '</div>' : '') +
     '<div class="tag-card-tag">' + (l.tag_l2 ? escHtml(l.tag_l2) : '<span style="color:var(--text-muted)">未标注</span>') +
@@ -485,7 +485,7 @@ function tagImportDialog() {
         '</div>' +
         '<div class="exp-actions">' +
           '<button class="btn" id="tagImportCancel">\u53d6\u6d88</button>' +
-          '<button class="btn btn-primary" onclick="tagImportDo()">\u5bfc\u5165</button>' +
+          '<button class="btn btn-primary" data-action="tag-import-do">\u5bfc\u5165</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
@@ -896,9 +896,9 @@ function tagEditCategory(index) {
         '<div style="margin-bottom:2px"><span style="font-size:0.72rem;color:var(--text-muted)">译文</span></div>' +
         '<div style="font-size:0.82rem;color:var(--accent);line-height:1.5;word-break:break-all">' + escHtml(line.translation) + '</div></div>' : '') +
     '</div>' +
-    '<div style="position:relative;margin-bottom:8px"><input type="text" id="tagEditSearch" placeholder="搜索类目..." class="param-input" style="width:100%" oninput="tagEditFilter()" autocomplete="off">' +
+    '<div style="position:relative;margin-bottom:8px"><input type="text" id="tagEditSearch" placeholder="搜索类目..." class="param-input" style="width:100%" data-action="tag-edit-filter" autocomplete="off">' +
     '<div id="tagEditDropdown" class="tag-edit-dropdown" style="display:none"></div></div>' +
-    '<select id="tagEditSelect" class="param-input" style="width:100%;margin-top:4px" onchange="tagEditSelectChange()">' + options + '</select>';
+    '<select id="tagEditSelect" class="param-input" style="width:100%;margin-top:4px" data-action="tag-edit-select-change">' + options + '</select>';
   modal.style.display = 'flex'; modal._index = index;
   document.getElementById('tagEditOk').onclick = function() {
     var sel = document.getElementById('tagEditSelect').value;
@@ -920,7 +920,7 @@ function tagEditFilter() {
   var matchItems = getAllSubCategories().filter(function(s){ return s.label.toLowerCase().indexOf(q)>=0 || s.l2.toLowerCase().indexOf(q)>=0; });
   if (matchItems.length===0) { dd.style.display='none'; return; }
   var editSchema = getEnabledSchema();
-  var h=''; matchItems.forEach(function(s){ h+='<div class="tag-edit-option" onclick="tagEditPick(\''+s.l1+'\',\''+s.l2+'\')"><span style="color:'+(editSchema[s.l1]?editSchema[s.l1].color:'#888')+'">'+escHtml(s.l1)+'</span> / '+escHtml(s.l2)+'</div>'; });
+  var h=''; matchItems.forEach(function(s){ h+='<div class="tag-edit-option" data-action="tag-edit-pick" data-l1="\''+s.l1+'\'" data-l2="\''+s.l2+'\'"><span style="color:'+(editSchema[s.l1]?editSchema[s.l1].color:'#888')+'">'+escHtml(s.l1)+'</span> / '+escHtml(s.l2)+'</div>'; });
   dd.innerHTML=h; dd.style.display='block';
 }
 function tagEditPick(l1,l2) {
@@ -1192,7 +1192,7 @@ function tagExportDialog() {
         '</div>' +
         '<div class="exp-actions">' +
           '<button class="btn" id="tagExportCancel">取消</button>' +
-          '<button class="btn btn-primary" onclick="tagExportDo()">导出</button>' +
+          '<button class="btn btn-primary" data-action="tag-export-do">导出</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
@@ -1453,7 +1453,7 @@ function tagRenderStrategyPresets() {
   if (!container) return;
   var html = '';
   _tagStrategyPresets.forEach(function(p, i) {
-    html += '<span class="prompt-chip preset" onclick="tagLoadStrategyPreset(' + i + ')" style="max-width:100px"><span class="chip-text">' + p.name + '</span></span>';
+    html += '<span class="prompt-chip preset" data-action="tag-strategy-preset" data-index="' + i + '" style="max-width:100px"><span class="chip-text">' + p.name + '</span></span>';
   });
   container.innerHTML = html;
 }
@@ -1553,17 +1553,17 @@ function tagOpenAdmin() {
           '<div class="tag-admin-right">' +
             '<div style="font-size:0.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px">二级类目池</div>' +
             '<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:6px">拖入左侧分配 | 双击编辑 | 仅此处可删除</div>' +
-            '<div class="tag-admin-pool" id="tagAdminPool" ondragover="event.preventDefault()" ondrop="tagAdminPoolDrop(event)"></div>' +
+            '<div class="tag-admin-pool" id="tagAdminPool" data-action="tag-admin-pool-drop"></div>' +
             '<div style="display:flex;gap:4px;margin-top:8px">' +
             '<input id="tagAdminPoolInput" class="tag-admin-pool-input" placeholder="输入新二级类目" style="flex:1"' +
             ' onkeydown="if(event.key===\'Enter\')tagAdminAddToPool()">' +
-            '<button class="btn btn-sm" onclick="tagAdminAddToPool()">+</button>' +
+            '<button class="btn btn-sm" data-action="tag-admin-add-pool">+</button>' +
           '</div>' +
           '</div>' +
         '</div>' +
         '<div class="modal-actions" style="margin-top:10px">' +
-          '<button class="btn" onclick="tagAdminExport()">导出</button>' +
-          '<button class="btn" onclick="tagAdminImport()">导入</button>' +
+          '<button class="btn" data-action="tag-admin-export">导出</button>' +
+          '<button class="btn" data-action="tag-admin-import">导入</button>' +
           '<span style="flex:1"></span>' +
           '<button class="btn btn-primary" id="tagAdminSave">保存并关闭</button>' +
           '<button class="btn" id="tagAdminCancel">取消</button>' +
@@ -1582,50 +1582,50 @@ function tagOpenAdmin() {
     var disabledCls = cat.enabled === false ? ' tag-admin-disabled' : '';
     leftHtml +=
       '<div class="tag-admin-group"' + disabledCls + '" data-l1="' + escHtml(l1) + '"' +
-        ' ondragover="tagAdminDragOver(event, this)"' +
-        ' ondragleave="tagAdminDragLeave(event, this)"' +
-        ' ondrop="tagAdminDrop(event, this)">' +
+        ' data-action="tag-admin-drag-over"' +
+        ' data-action="tag-admin-drag-leave"' +
+        ' data-action="tag-admin-drop">' +
         '<div class="tag-admin-group-header">' +
           '<label class="tag-admin-enabled-wrap" title="启用/禁用">' +
             '<input type="checkbox" class="tag-admin-enabled"' + (cat.enabled !== false ? ' checked' : '') +
-              ' onchange="this.closest(\'.tag-admin-group\').classList.toggle(\'tag-admin-disabled\', !this.checked)">' +
+              ' data-action="admin-toggle-group">' +
           '</label>' +
-          '<input class="tag-admin-icon" value="' + escHtml(cat.icon || '📌') + '" onchange="_autoSave()" style="width:30px;text-align:center">' +
+          '<input class="tag-admin-icon" value="' + escHtml(cat.icon || '📌') + '" data-action="auto-save" style="width:30px;text-align:center">' +
           '<input class="tag-admin-name" value="' + escHtml(l1) + '" style="flex:1"' +
-            ' ondblclick="this.readOnly=false;this.focus();this.select()"' +
-            ' onblur="this.readOnly=true"' +
+            ' data-action="make-editable"' +
+            ' data-action="lock"' +
             ' readonly">' +
-          '<input class="tag-admin-color" type="color" value="' + (cat.color || '#888') + '" onchange="_autoSave()" title="颜色">' +
-          '<button class="btn btn-sm" onclick="tagAdminAddSub(this)">+子项</button>' +
-          '<button class="btn btn-sm tag-admin-del-btn" onclick="tagAdminRemoveGroup(this)">🗑</button>' +
+          '<input class="tag-admin-color" type="color" value="' + (cat.color || '#888') + '" data-action="auto-save" title="颜色">' +
+          '<button class="btn btn-sm" data-action="tag-admin-add-sub">+子项</button>' +
+          '<button class="btn btn-sm tag-admin-del-btn" data-action="tag-admin-remove-group">🗑</button>' +
         '</div>' +
         '<div class="tag-admin-subs">';
     (cat.subs || []).forEach(function(sub) {
       leftHtml += '<span class="tag-admin-sub-wrap" draggable="true"' +
-        ' ondragstart="tagAdminSubDragStart(event, this)"' +
-        ' ondragend="tagAdminSubDragEnd(event, this)">' +
+        ' data-action="tag-admin-sub-drag-start"' +
+        ' data-action="tag-admin-sub-drag-end">' +
         '<input class="tag-admin-sub" value="' + escHtml(sub) + '"' +
-          ' ondblclick="this.readOnly=false;this.focus();this.select()"' +
-          ' onblur="this.readOnly=true;_autoSave()"' +
+          ' data-action="make-editable"' +
+          ' data-action="lock-save"' +
           ' readonly">' +
-        '<span class="tag-admin-sub-del" onclick="tagAdminRemoveSub(this)" title="移回二级池">&times;</span>' +
+        '<span class="tag-admin-sub-del" data-action="tag-admin-remove-sub" title="移回二级池">&times;</span>' +
       '</span>';
     });
     leftHtml += '</div></div>';
   });
   leftHtml += '</div>';
-  leftHtml += '<button class="btn btn-sm" onclick="tagAdminAddGroup()" style="margin-top:4px">+ 添加一级类目</button>';
+  leftHtml += '<button class="btn btn-sm" data-action="tag-admin-add-group" style="margin-top:4px">+ 添加一级类目</button>';
   document.getElementById('tagAdminLeft').innerHTML = leftHtml;
 
   var poolHtml = '';
   availablePool.forEach(function(name) {
     poolHtml +=
       '<div class="tag-admin-pool-chip" draggable="true"' +
-        ' ondragstart="tagAdminPoolDragStart(event, this)"' +
-        ' ondragend="tagAdminPoolDragEnd(event, this)"' +
-        ' ondblclick="tagAdminPoolEdit(event, this)">' +
+        ' data-action="tag-admin-pool-drag-start"' +
+        ' data-action="tag-admin-pool-drag-end"' +
+        ' data-action="tag-admin-pool-edit">' +
         '<span class="tag-admin-pool-text">' + escHtml(name) + '</span>' +
-        '<span class="tag-admin-pool-del" onclick="tagAdminDeletePoolItem(event, this)" title="永久删除">&times;</span>' +
+        '<span class="tag-admin-pool-del" data-action="tag-admin-del-pool-item" title="永久删除">&times;</span>' +
       '</div>';
   });
   if (poolHtml === '') {
@@ -1642,10 +1642,10 @@ function tagAdminAddSub(btn) {
   var span = document.createElement('span');
   span.className = 'tag-admin-sub-wrap';
   span.draggable = true;
-  span.setAttribute('ondragstart', 'tagAdminSubDragStart(event, this)');
-  span.setAttribute('ondragend', 'tagAdminSubDragEnd(event, this)');
+  span.setAttribute('data-action', 'tag-admin-sub-drag-start');
+  span.setAttribute('data-action', 'tag-admin-sub-drag-end');
   span.innerHTML = '<input class="tag-admin-sub" placeholder="新子项" value="">' +
-    '<span class="tag-admin-sub-del" onclick="tagAdminRemoveSub(this)" title="移回二级池">&times;</span>';
+    '<span class="tag-admin-sub-del" data-action="tag-admin-remove-sub" title="移回二级池">&times;</span>';
   wrapper.appendChild(span);
   span.querySelector('input').focus();
 }
@@ -1664,19 +1664,19 @@ function tagAdminAddGroup() {
   var list = document.getElementById('tagAdminList');
   var newGroup = document.createElement('div');
   newGroup.className = 'tag-admin-group';
-  newGroup.setAttribute('ondragover', 'tagAdminDragOver(event, this)');
-  newGroup.setAttribute('ondragleave', 'tagAdminDragLeave(event, this)');
-  newGroup.setAttribute('ondrop', 'tagAdminDrop(event, this)');
+  newGroup.setAttribute('data-action', 'tag-admin-drag-over');
+  newGroup.setAttribute('data-action', 'tag-admin-drag-leave');
+  newGroup.setAttribute('data-action', 'tag-admin-drop');
   newGroup.dataset.l1 = '新类目';
   newGroup.innerHTML = '<div class="tag-admin-group-header">' +
     '<label class="tag-admin-enabled-wrap" title="启用/禁用">' +
-      '<input type="checkbox" class="tag-admin-enabled" checked onchange="this.closest(\'.tag-admin-group\').classList.toggle(\'tag-admin-disabled\', !this.checked);_autoSave()">' +
+      '<input type="checkbox" class="tag-admin-enabled" checked data-action="admin-toggle-group">' +
     '</label>' +
-    '<input class="tag-admin-icon" value="📌" onchange="_autoSave()" style="width:30px;text-align:center">' +
-    '<input class="tag-admin-name" value="新类目" ondblclick="this.readOnly=false;this.focus();this.select()" onblur="this.readOnly=true;_autoSave()" readonly style="flex:1">' +
-    '<input class="tag-admin-color" type="color" value=' + _randomAdminColor() + ' onchange="_autoSave()">' +
-    '<button class="btn btn-sm" onclick="tagAdminAddSub(this)">+子项</button>' +
-    '<button class="btn btn-sm tag-admin-del-btn" onclick="tagAdminRemoveGroup(this)">🗑</button>' +
+    '<input class="tag-admin-icon" value="📌" data-action="auto-save" style="width:30px;text-align:center">' +
+    '<input class="tag-admin-name" value="新类目" data-action="make-editable" data-action="lock-save" readonly style="flex:1">' +
+    '<input class="tag-admin-color" type="color" value=' + _randomAdminColor() + ' data-action="auto-save">' +
+    '<button class="btn btn-sm" data-action="tag-admin-add-sub">+子项</button>' +
+    '<button class="btn btn-sm tag-admin-del-btn" data-action="tag-admin-remove-group">🗑</button>' +
   '</div>' +
   '<div class="tag-admin-subs"></div>';
   list.appendChild(newGroup);
@@ -1754,10 +1754,10 @@ function tagAdminDrop(e, group) {
   
   // 添加到目标类目
   var subHtml = '<span class="tag-admin-sub-wrap" draggable="true"' +
-    ' ondragstart="tagAdminSubDragStart(event, this)"' +
-    ' ondragend="tagAdminSubDragEnd(event, this)">' +
-    '<input class="tag-admin-sub" value="' + escHtml(name) + '" ondblclick="this.readOnly=false;this.focus();this.select()" onblur="this.readOnly=true" readonly>' +
-    '<span class="tag-admin-sub-del" onclick="tagAdminRemoveSub(this)" title="移回二级池">&times;</span>' +
+    ' data-action="tag-admin-sub-drag-start"' +
+    ' data-action="tag-admin-sub-drag-end">' +
+    '<input class="tag-admin-sub" value="' + escHtml(name) + '" data-action="make-editable" data-action="lock" readonly>' +
+    '<span class="tag-admin-sub-del" data-action="tag-admin-remove-sub" title="移回二级池">&times;</span>' +
   '</span>';
   var subsDiv = group.querySelector('.tag-admin-subs');
   var temp = document.createElement('div'); temp.innerHTML = subHtml; subsDiv.appendChild(temp.firstElementChild);
@@ -1862,9 +1862,9 @@ function _refreshPool() {
   if (available.length === 0) { container.innerHTML = '<div style="font-size:0.68rem;color:var(--text-muted);text-align:center;padding:12px 0">池中暂无二级类目<br>点击下方按钮添加</div>'; return; }
   var html = '';
   available.forEach(function(name) {
-    html += '<div class="tag-admin-pool-chip" draggable="true" ondragstart="tagAdminPoolDragStart(event, this)" ondragend="tagAdminPoolDragEnd(event, this)" ondblclick="tagAdminPoolEdit(event, this)">' +
+    html += '<div class="tag-admin-pool-chip" draggable="true" data-action="tag-admin-pool-drag-start" data-action="tag-admin-pool-drag-end" data-action="tag-admin-pool-edit">' +
       '<span class="tag-admin-pool-text">' + escHtml(name) + '</span>' +
-      '<span class="tag-admin-pool-del" onclick="tagAdminDeletePoolItem(event, this)" title="永久删除">&times;</span>' +
+      '<span class="tag-admin-pool-del" data-action="tag-admin-del-pool-item" title="永久删除">&times;</span>' +
     '</div>';
   });
   container.innerHTML = html;
@@ -1973,12 +1973,175 @@ function tagInit() {
     dz.addEventListener('drop', function(e){e.preventDefault();dz.classList.remove('drag-over');if(e.dataTransfer.files.length>0)tagProcessFiles(e.dataTransfer.files);});
     fi.addEventListener('change', function(){if(fi.files.length>0)tagProcessFiles(fi.files);});
   }
+
   // 初始化分类策略
   _initTagStrategy();
-  // 选中状态变化时更新按钮
-  document.addEventListener('change', function(e) {
-    // (checkbox listener removed)
+
+  // ── 静态按钮绑定 ──
+  var _b = function(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  _b('tagBtnStart', tagStart);
+  _b('tagBtnStop', tagStop);
+  _b('tagBtnClear', tagClearAll);
+  _b('tagBtnExport', tagExportDialog);
+  _b('tagBtnImport', tagImportDialog);
+  _b('tagCatToggle', tagToggleCatPanel);
+  _b('tagStrategyToggle', tagToggleStrategy);
+
+  // 标签管理按钮
+  var adminBtn = document.querySelector('#page-tag .tag-ctrl-header .btn-sm');
+  if (adminBtn && adminBtn.textContent.indexOf('管理') >= 0) adminBtn.addEventListener('click', tagOpenAdmin);
+
+  // 分类策略重置
+  var stratReset = document.querySelector('#tagStrategyRow .btn-sm');
+  if (stratReset && stratReset.textContent.trim() === '↻') stratReset.addEventListener('click', resetTagStrategy);
+  // 策略预设
+  var presets = document.getElementById('tagStrategyPresets');
+  if (presets) presets.addEventListener('click', function(e) {
+    var chip = e.target.closest('[data-index]');
+    if (chip) tagLoadStrategyPreset(parseInt(chip.dataset.index));
   });
+  // 策略文本输入
+  var stratText = document.getElementById('tagStrategyText');
+  if (stratText) stratText.addEventListener('input', saveTagStrategy);
+
+  // 分词页来源输入按钮
+  document.querySelectorAll('#page-tag .manual-input .btn').forEach(function(btn) {
+    var txt = btn.textContent.trim();
+    if (txt === '添加') btn.addEventListener('click', tagLoadManualInput);
+    if (txt === '重置') btn.addEventListener('click', tagClearAll);
+  });
+
+  // 分词页搜索
+  var ts = document.getElementById('tagSearch');
+  if (ts) ts.addEventListener('input', tagOnSearch);
+  // 行数限制
+  _b('tagPreviewRowLimit', function(e) { tagOnRowLimitChange(); });
+  _b('tagPreviewCustomLimit', function(e) { tagOnCustomLimitChange(); });
+
+  // ── 动态内容事件委托 ──
+  // 文件列表
+  var tagFileInfo = document.getElementById('tagFileInfo');
+  if (tagFileInfo) tagFileInfo.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    var idx = parseInt(btn.dataset.index);
+    if (action === 'tag-delete-file') tagDeleteFile(idx);
+  });
+
+  // 分类卡片
+  var tagColumns = document.getElementById('tagColumns');
+  if (tagColumns) tagColumns.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    var idx = parseInt(btn.dataset.index);
+    if (action === 'tag-edit-cat') tagEditCategory(idx);
+  });
+
+  // 导入/导出弹窗
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action === 'tag-import-do') tagImportDo();
+    else if (action === 'tag-export-do') tagExportDo();
+    else if (action === 'tag-edit-pick') tagEditPick(btn.dataset.l1, btn.dataset.l2);
+    else if (action === 'tag-strategy-preset') tagLoadStrategyPreset(parseInt(btn.dataset.index));
+  });
+
+  // 标签管理面板
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action === 'tag-admin-add-pool') tagAdminAddToPool();
+    else if (action === 'tag-admin-export') tagAdminExport();
+    else if (action === 'tag-admin-import') tagAdminImport();
+    else if (action === 'tag-admin-add-sub') tagAdminAddSub(btn);
+    else if (action === 'tag-admin-remove-group') tagAdminRemoveGroup(btn);
+    else if (action === 'tag-admin-remove-sub') tagAdminRemoveSub(btn);
+    else if (action === 'tag-admin-add-group') tagAdminAddGroup();
+    else if (action === 'tag-admin-del-pool-item') tagAdminDeletePoolItem(e, btn);
+    else if (action === 'tag-edit-pick') tagEditPick(btn.dataset.l1, btn.dataset.l2);
+    else if (action === 'make-editable') { btn.readOnly = false; btn.focus(); btn.select(); }
+    else if (action === 'tag-admin-pool-edit') tagAdminPoolEdit(e, btn);
+  });
+
+  // ── 标签页：input/change/blur 委托 ──
+  var tagPage = document.getElementById('page-tag');
+  if (tagPage) {
+    tagPage.addEventListener('input', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      if (el.dataset.action === 'tag-edit-filter') tagEditFilter();
+    });
+    tagPage.addEventListener('change', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'tag-edit-select-change') tagEditSelectChange();
+      else if (action === 'auto-save') _autoSave();
+      else if (action === 'admin-toggle-group') {
+        var group = el.closest('.tag-admin-group');
+        if (group) group.classList.toggle('tag-admin-disabled', !el.checked);
+        _autoSave();
+      }
+    });
+    tagPage.addEventListener('blur', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'lock-save') { el.readOnly = true; _autoSave(); }
+      else if (action === 'lock') el.readOnly = true;
+    }, true);
+    tagPage.addEventListener('dblclick', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      if (el.dataset.action === 'make-editable') { el.readOnly = false; el.focus(); el.select(); }
+    });
+    // Drag/drop delegation for tag cards
+    tagPage.addEventListener('dragstart', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'tag-card-drag-start') tagCardDragStart(e);
+      else if (action === 'tag-admin-sub-drag-start') tagAdminSubDragStart(e, el);
+      else if (action === 'tag-admin-pool-drag-start') tagAdminPoolDragStart(e, el);
+    });
+    tagPage.addEventListener('dragend', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'tag-card-drag-end') tagCardDragEnd(e);
+      else if (action === 'tag-admin-sub-drag-end') tagAdminSubDragEnd(e, el);
+      else if (action === 'tag-admin-pool-drag-end') tagAdminPoolDragEnd(e, el);
+    });
+    tagPage.addEventListener('dragover', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'tag-drag-over') { e.preventDefault(); tagDragOver(e); }
+      else if (action === 'tag-admin-drag-over') { e.preventDefault(); tagAdminDragOver(e, el); }
+    });
+    tagPage.addEventListener('dragleave', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'tag-drag-leave') tagDragLeave(e);
+      else if (action === 'tag-admin-drag-leave') tagAdminDragLeave(e, el);
+    });
+    tagPage.addEventListener('drop', function(e) {
+      e.preventDefault();
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'tag-drop') tagDrop(e);
+      else if (action === 'tag-admin-pool-drop') tagAdminPoolDrop(e);
+      else if (action === 'tag-admin-drop') tagAdminDrop(e, el);
+    });
+  }
+
   // 点击外部关闭标签搜索下拉框
   document.addEventListener('click', function(e) {
     var dd = document.getElementById('tagEditDropdown');
@@ -1988,97 +2151,21 @@ function tagInit() {
       }
     }
   });
+
   // 初始渲染
   tagRenderColumns();
 }
 // ── Window bindings (HTML onclick compat) ──
-window.tagAdminAddGroup = tagAdminAddGroup;
-window.tagAdminAddSub = tagAdminAddSub;
-window.tagAdminAddToPool = tagAdminAddToPool;
-window.tagAdminDeletePoolItem = tagAdminDeletePoolItem;
-window.tagAdminDragLeave = tagAdminDragLeave;
-window.tagAdminDragOver = tagAdminDragOver;
-window.tagAdminDrop = tagAdminDrop;
-window.tagAdminExport = tagAdminExport;
-window.tagAdminImport = tagAdminImport;
-window.tagAdminPoolDragEnd = tagAdminPoolDragEnd;
-window.tagAdminPoolDragStart = tagAdminPoolDragStart;
-window.tagAdminPoolEdit = tagAdminPoolEdit;
-window.tagAdminRemoveGroup = tagAdminRemoveGroup;
-window.tagAdminRemoveSub = tagAdminRemoveSub;
-window.tagBtnState = tagBtnState;
-window.tagCardDragEnd = tagCardDragEnd;
-window.tagCardDragStart = tagCardDragStart;
-window.tagClearAll = tagClearAll;
-window.tagClearSearch = tagClearSearch;
-window.tagDeleteFile = tagDeleteFile;
-window.tagDragLeave = tagDragLeave;
-window.tagDragOver = tagDragOver;
-window.tagDrop = tagDrop;
-window.tagEditCategory = tagEditCategory;
-window.tagEditFilter = tagEditFilter;
-window.tagEditPick = tagEditPick;
-window.tagEditSelectChange = tagEditSelectChange;
-window.tagExport = tagExport;
-window.tagExportSeparate = tagExportSeparate;
-window.resetTagStrategy = resetTagStrategy;
-window.tagGetApiConfig = tagGetApiConfig;
-window.tagInit = tagInit;
-window.tagLoadManualInput = tagLoadManualInput;
-window.tagLoadStrategyPreset = tagLoadStrategyPreset;
-window.tagLog = tagLog;
-window.tagLogClear = tagLogClear;
-window.tagOnCustomLimitChange = tagOnCustomLimitChange;
-window.tagOnRowLimitChange = tagOnRowLimitChange;
-window.tagOnSearch = tagOnSearch;
-window.tagOpenAdmin = tagOpenAdmin;
-window.tagProcessFiles = tagProcessFiles;
-window.tagRenderCard = tagRenderCard;
-window.tagRenderCatPanel = tagRenderCatPanel;
-window.tagRenderColumns = tagRenderColumns;
-window.tagRenderFileList = tagRenderFileList;
-window.tagRenderPreview = tagRenderPreview;
-window.tagRenderStrategyPresets = tagRenderStrategyPresets;
-window.tagSendToTranslate = tagSendToTranslate;
-window.tagStart = tagStart;
-window.tagStop = tagStop;
-window.tagToggleCatPanel = tagToggleCatPanel;
-window.tagToggleCollapse = tagToggleCollapse;
-window.tagToggleStrategy = tagToggleStrategy;
-window.tagTriggerDownload = tagTriggerDownload;
-window.tagUpdateCounts = tagUpdateCounts;
-window.tagUpdateOneCard = tagUpdateOneCard;
-window.tagUpdateTagStartButton = tagUpdateTagStartButton;
 
 // ── Module export
-window.tagAdminSubDragStart = tagAdminSubDragStart;
-window.tagAdminSubDragEnd = tagAdminSubDragEnd;
-window.tagAdminPoolDrop = tagAdminPoolDrop;
-
-window._autoSave = _autoSave;
 
 
-window.tagExportDialog = tagExportDialog;
-window.tagExportDo = tagExportDo;
 
-window.tagImportDialog = tagImportDialog;
-window.tagImportDo = tagImportDo;
+
 
 // ── Module exports ──
 export {
-  tagAdminAddGroup, tagAdminAddSub, tagAdminAddToPool, tagAdminDeletePoolItem,
-  tagAdminDragLeave, tagAdminDragOver, tagAdminDrop, tagAdminExport, tagAdminImport,
-  tagAdminPoolDragEnd, tagAdminPoolDragStart, tagAdminPoolDrop, tagAdminPoolEdit,
-  tagAdminRemoveGroup, tagAdminRemoveSub, tagAdminSubDragStart, tagAdminSubDragEnd,
-  tagBtnState, tagCardDragEnd, tagCardDragStart, tagClearAll, tagClearSearch,
-  tagDeleteFile, tagDragLeave, tagDragOver, tagDrop, tagEditCategory,
-  tagEditFilter, tagEditPick, tagEditSelectChange, tagExport, tagExportDialog,
-  tagExportDo, tagExportSeparate, tagGetApiConfig, tagImportDialog, tagImportDo,
-  tagInit, tagLoadManualInput, tagLoadStrategyPreset, tagLog, tagLogClear,
-  tagOnCustomLimitChange, tagOnRowLimitChange, tagOnSearch, tagOpenAdmin,
-  tagProcessFiles, tagRenderCard, tagRenderCatPanel, tagRenderColumns,
-  tagRenderFileList, tagRenderPreview, tagRenderStrategyPresets,
-  tagSendToTranslate, tagStart, tagStop, tagToggleCatPanel, tagToggleCollapse,
-  tagToggleStrategy, tagTriggerDownload, tagUpdateCounts, tagUpdateOneCard,
-  tagUpdateTagStartButton, resetTagStrategy,
+  tagInit, tagLoadManualInput, tagClearAll, tagOnSearch, tagOnRowLimitChange, tagOnCustomLimitChange,
+  tagStart, tagStop, tagExportDialog, tagImportDialog, tagToggleCatPanel, tagToggleStrategy,
+  tagOpenAdmin, tagToggleCollapse, resetTagStrategy, saveTagStrategy
 };

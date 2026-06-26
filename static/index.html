@@ -21,32 +21,32 @@
   <div class="toolbar-left">
     <h1>LinguaForge</h1>
     <!-- SPA 导航：用 hash 切换 -->
-    <a href="#translate" class="nav-link active" id="navTranslate" onclick="switchPage('translate');return false">翻译</a>
-    <a href="#tag" class="nav-link" id="navTag" onclick="switchPage('tag');return false">分词</a>
-    <a href="#dedup" class="nav-link" id="navDedup" onclick="switchPage('dedup');return false">去重</a>
+    <a href="#translate" class="nav-link active" id="navTranslate">翻译</a>
+    <a href="#tag" class="nav-link" id="navTag">分词</a>
+    <a href="#dedup" class="nav-link" id="navDedup">去重</a>
     <span id="llmStatus">
       <span class="dot dot-err"></span>
       <span class="status-text">LLM 未连接</span>
     </span>
     <span class="segmented-toggle" style="margin-left:10px" id="providerToggle">
-      <button class="btn btn-sm segmented-btn active" id="btnLocal" onclick="setProvider('local')">本地LLM</button>
-      <button class="btn btn-sm segmented-btn" id="btnCommercial" onclick="setProvider('commercial')">商业API</button>
+      <button class="btn btn-sm segmented-btn active" id="btnLocal">本地LLM</button>
+      <button class="btn btn-sm segmented-btn" id="btnCommercial">商业API</button>
     </span>
   </div>
 
   <!-- 翻译页工具栏右侧按钮 -->
   <div class="toolbar-right" id="translateToolbarRight">
-    <button class="btn" onclick="exportFile()" id="btnExport" disabled>导出译文</button>
+    <button class="btn" id="btnExport" disabled>导出译文</button>
     <span id="exportOptions" class="export-options">
-      <button class="btn" onclick="exportSeparate()">分别导出</button>
-      <button class="btn" onclick="exportGrouped()">合并导出</button>
-      <button class="btn" onclick="cancelExport()">取消</button>
+      <button class="btn">分别导出</button>
+      <button class="btn">合并导出</button>
+      <button class="btn">取消</button>
     </span>
   </div>
 
   <!-- 分词页工具栏右侧（收起/展开按钮） -->
   <div class="toolbar-right" id="tagToolbarRight" style="display:none">
-    <div class="tag-collapse-bar" id="tagCollapseBar" onclick="tagToggleCollapse()" title="收起/展开输入和预览">
+    <div class="tag-collapse-bar" id="tagCollapseBar" title="收起/展开输入和预览">
       <span id="tagCollapseIcon">▲</span>
       <span class="collapse-title">输入/预览</span>
     </div>
@@ -56,12 +56,12 @@
 <!-- 商业 API 配置条（仅选择商业 API 时显示，两个页面共享） -->
 <div class="toolbar-api-bar" id="apiConfigBar" style="display:none">
   <div class="toolbar-api-inner">
-    <input type="text" id="apiBase" placeholder="API Base URL" class="param-input" style="flex:2;min-width:180px" oninput="saveApiConfig()">
-    <input type="password" id="apiKey" placeholder="API Key" class="param-input" style="flex:2;min-width:160px" oninput="saveApiConfig()">
-    <input type="text" id="modelName" placeholder="Model Name" class="param-input" style="flex:1;min-width:100px" oninput="saveApiConfig()">
-    <button class="btn btn-sm" onclick="testApiConnection()">测试连接</button>
+    <input type="text" id="apiBase" placeholder="API Base URL" class="param-input" style="flex:2;min-width:180px">
+    <input type="password" id="apiKey" placeholder="API Key" class="param-input" style="flex:2;min-width:160px">
+    <input type="text" id="modelName" placeholder="Model Name" class="param-input" style="flex:1;min-width:100px">
+    <button class="btn btn-sm">测试连接</button>
     <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:var(--text-secondary);cursor:pointer;margin-left:4px">
-      <input type="checkbox" id="enableThinking" onchange="onThinkingChange();saveApiConfig()" style="accent-color:var(--accent)">
+      <input type="checkbox" id="enableThinking" style="accent-color:var(--accent)">
       思考
     </label>
     <span style="font-size:0.65rem;color:var(--text-muted)" title="关闭思考/推理可提速；用非推理模型如 deepseek-chat 也更快">💡 提速</span>
@@ -78,19 +78,19 @@
     <div class="card-header">
       <div class="header-left">📋 源文本预览 <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted);margin-left:4px">（悬停可见翻译按钮）</span></div>
       <div class="search-wrap" id="previewSearchWrap">
-        <select id="previewRowLimit" onchange="onPreviewRowLimitChange()">
+        <select id="previewRowLimit">
           <option value="2000">2000</option>
           <option value="5000">5000</option>
           <option value="-1">全部</option>
           <option value="-2">自定</option>
         </select>
-        <input id="previewCustomLimit" type="number" min="1" placeholder="行数" onchange="onPreviewCustomLimitChange()" class="preview-limit-input" style="display:none">
+        <input id="previewCustomLimit" type="number" min="1" placeholder="行数" class="preview-limit-input" style="display:none">
         <span class="search-count" id="previewSearchCount"></span>
-        <input class="search-input" id="previewSearch" placeholder="搜索..." oninput="onPreviewSearch()">
-        <span class="search-clear" onclick="clearPreviewSearch()">×</span>
-        <button class="btn btn-sm" onclick="deleteCheckedPreview()" title="删除选中的预览条目">🗑</button>
-        <button class="btn btn-sm" id="btnTranslatePreviewSel" onclick="translatePreviewSelected()" style="display:none" disabled>译</button>
-        <input type="checkbox" id="selectAllPreview" onclick="toggleSelectAllPreview()" title="全选/取消当前预览条目" style="display:none;margin-right:4px">
+        <input class="search-input" id="previewSearch" placeholder="搜索...">
+        <span class="search-clear">×</span>
+        <button class="btn btn-sm" title="删除选中的预览条目">🗑</button>
+        <button class="btn btn-sm" id="btnTranslatePreviewSel" style="display:none" disabled>译</button>
+        <input type="checkbox" id="selectAllPreview" title="全选/取消当前预览条目" style="display:none;margin-right:4px">
       </div>
     </div>
     <div class="card-body" id="cardPreview">
@@ -102,14 +102,14 @@
   <div class="card">
     <div class="card-header">
       <div class="header-left">📊 翻译对比 <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted);margin-left:4px">（点击新译文可编辑）</span></div>
-      <button class="btn btn-sm" onclick="toggleSort()" id="btnSort" title="按原文排序">▼</button>
-      <button class="btn btn-sm" onclick="retrySelected()" id="btnRetrySelected" title="用当前模式重译选中的条目">重译选中</button>
-      <button class="btn btn-sm" onclick="copySelectedRows()" title="复制选中行（原文=译文），未选中则复制全部可见行" id="btnCopySelected">复制选中</button>
-      <button class="btn btn-sm" onclick="deleteSelectedRows()" title="删除选中的条目" id="btnDeleteSelected">删除选中</button>
-      <button class="btn btn-sm" onclick="exportCheckedRows()" title="导出勾选的条目" id="btnExportChecked">导出选中</button>
+      <button class="btn btn-sm" id="btnSort" title="按原文排序">▼</button>
+      <button class="btn btn-sm" id="btnRetrySelected" title="用当前模式重译选中的条目">重译选中</button>
+      <button class="btn btn-sm" title="复制选中行（原文=译文），未选中则复制全部可见行" id="btnCopySelected">复制选中</button>
+      <button class="btn btn-sm" title="删除选中的条目" id="btnDeleteSelected">删除选中</button>
+      <button class="btn btn-sm" title="导出勾选的条目" id="btnExportChecked">导出选中</button>
       <div class="search-wrap" id="compareSearchWrap">
-        <input class="search-input" id="compareSearch" placeholder="搜索..." oninput="onCompareSearch()">
-        <span class="search-clear" onclick="clearCompareSearch()">×</span>
+        <input class="search-input" id="compareSearch" placeholder="搜索...">
+        <span class="search-clear">×</span>
         <span class="search-count" id="compareSearchCount"></span>
       </div>
     </div>
@@ -125,8 +125,8 @@
       <div class="manual-input" style="display:flex;align-items:stretch;gap:6px">
         <textarea id="manualInput" placeholder="或手动输入，每行一条：原文=译文" style="flex:1"></textarea>
         <div style="display:flex;flex-direction:column;gap:4px">
-          <button class="btn btn-primary btn-sm" id="btnManualInput" onclick="loadManualInput()" style="flex:1">加载</button>
-          <button class="btn btn-primary btn-sm" onclick="resetSourceInput()" title="重置来源输入和源文本预览" style="flex:1">重置</button>
+          <button class="btn btn-primary btn-sm" id="btnManualInput" style="flex:1">加载</button>
+          <button class="btn btn-primary btn-sm" title="重置来源输入和源文本预览" style="flex:1">重置</button>
         </div>
       </div>
       <div class="drop-zone" id="dropZone">
@@ -144,43 +144,43 @@
     <div class="card-header">🔄 LLM 翻译</div>
     <div class="card-body" id="cardTranslate">
       <div class="translate-controls">
-        <button class="btn btn-primary" id="btnTranslateAll" disabled onclick="translateAll()">翻译全部</button>
-        <button class="btn" id="btnClearAll" disabled onclick="clearAllTranslations()" title="清除已翻译的条目（保留未翻译源文）">清除全部</button>
-        <button class="btn" id="btnRetryFailed" disabled onclick="retryFailed()">重试失败行</button>
-        <button class="btn" id="btnStop" disabled onclick="stopTranslate()">停止</button>
+        <button class="btn btn-primary" id="btnTranslateAll" disabled>翻译全部</button>
+        <button class="btn" id="btnClearAll" disabled title="清除已翻译的条目（保留未翻译源文）">清除全部</button>
+        <button class="btn" id="btnRetryFailed" disabled>重试失败行</button>
+        <button class="btn" id="btnStop" disabled>停止</button>
         <span class="segmented-toggle" id="modeToggle">
-          <button class="btn btn-sm segmented-btn active" id="btnModeDirect" onclick="setMode('direct')">直译</button>
-          <button class="btn btn-sm segmented-btn" id="btnModePolish" onclick="setMode('polish')">润色</button>
+          <button class="btn btn-sm segmented-btn active" id="btnModeDirect">直译</button>
+          <button class="btn btn-sm segmented-btn" id="btnModePolish">润色</button>
         </span>
         <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px">并发</span>
-        <input type="number" id="concurrency" value="5" min="1" max="10" class="param-input" onchange="saveModeParams(state.translateMode)" style="width:42px">
+        <input type="number" id="concurrency" value="5" min="1" max="10" class="param-input" style="width:42px">
       </div>
       <div class="param-row">
-        <label title="随机性：越高译文越多变、越丰富；越低越稳定、越保守。&#10;0=完全确定，2=极度随机&#10;双击恢复默认值 0.7" ondblclick="resetParamDefault(this.nextElementSibling)">Temperature</label>
-        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" class="param-input" onchange="saveModeParams(state.translateMode)">
-        <label title="核采样：限制候选词范围。越低越保守，越高越多样。&#10;取 1=不限制，取 0.5=只考虑前 50% 概率的候选词&#10;双击恢复默认值 0.6" ondblclick="resetParamDefault(this.nextElementSibling)">Top P</label>
-        <input type="number" id="top_p" value="0.6" min="0" max="1" step="0.05" class="param-input" onchange="saveModeParams(state.translateMode)">
-        <label title="输出长度上限：限制每次翻译的最大输出量。&#10;设太小可能截断长句，设太大拖慢速度。&#10;双击恢复默认值 512" ondblclick="resetParamDefault(this.nextElementSibling)">Max Tokens</label>
-        <input type="number" id="max_tokens" value="1024" min="1" max="4096" class="param-input" onchange="saveModeParams(state.translateMode)">
-        <label title="重复惩罚：越高越避免重复用词，但过高可能导致用词不自然。&#10;取 1=不惩罚，1.05=轻微惩罚，1.2=明显惩罚&#10;双击恢复默认值 1.05" ondblclick="resetParamDefault(this.nextElementSibling)">Rep Penalty</label>
-        <input type="number" id="repetition_penalty" value="1.05" min="1" max="2" step="0.05" class="param-input" onchange="saveModeParams(state.translateMode)">
-        <span class="prompt-toggle" id="promptToggle" onclick="togglePrompt()" title="展开/折叠翻译提示词">翻译提示词 ▼</span><button class="btn btn-sm" onclick="resetSystemPrompt()" title="恢复当前模式的默认提示词" style="padding:2px 6px;font-size:0.85rem;margin-left:4px">↻</button>
-        <span class="prompt-toggle" id="polishStrategyToggle" onclick="togglePolishStrategy()" title="展开/折叠润色提示词（第二步：对比润色）" style="display:none;margin-left:8px">润色提示词 ▼</span><button class="btn btn-sm" onclick="resetPolishStrategy()" title="恢复默认润色提示词" style="padding:2px 6px;font-size:0.85rem;margin-left:4px;display:none" id="btnResetPolishStrategy">↻</button>
+        <label title="随机性：越高译文越多变、越丰富；越低越稳定、越保守。&#10;0=完全确定，2=极度随机&#10;双击恢复默认值 0.7">Temperature</label>
+        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" class="param-input">
+        <label title="核采样：限制候选词范围。越低越保守，越高越多样。&#10;取 1=不限制，取 0.5=只考虑前 50% 概率的候选词&#10;双击恢复默认值 0.6">Top P</label>
+        <input type="number" id="top_p" value="0.6" min="0" max="1" step="0.05" class="param-input">
+        <label title="输出长度上限：限制每次翻译的最大输出量。&#10;设太小可能截断长句，设太大拖慢速度。&#10;双击恢复默认值 512">Max Tokens</label>
+        <input type="number" id="max_tokens" value="1024" min="1" max="4096" class="param-input">
+        <label title="重复惩罚：越高越避免重复用词，但过高可能导致用词不自然。&#10;取 1=不惩罚，1.05=轻微惩罚，1.2=明显惩罚&#10;双击恢复默认值 1.05">Rep Penalty</label>
+        <input type="number" id="repetition_penalty" value="1.05" min="1" max="2" step="0.05" class="param-input">
+        <span class="prompt-toggle" id="promptToggle" title="展开/折叠翻译提示词">翻译提示词 ▼</span><button class="btn btn-sm" title="恢复当前模式的默认提示词" style="padding:2px 6px;font-size:0.85rem;margin-left:4px">↻</button>
+        <span class="prompt-toggle" id="polishStrategyToggle" title="展开/折叠润色提示词（第二步：对比润色）" style="display:none;margin-left:8px">润色提示词 ▼</span><button class="btn btn-sm" title="恢复默认润色提示词" style="padding:2px 6px;font-size:0.85rem;margin-left:4px;display:none" id="btnResetPolishStrategy">↻</button>
       </div>
       <div id="promptRow" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px">
-        <textarea class="prompt-area visible" id="system_prompt" placeholder="System prompt..." onchange="saveModeParams(state.translateMode)" style="width:100%;min-height:70px;resize:vertical;margin-bottom:0"></textarea>
+        <textarea class="prompt-area visible" id="system_prompt" placeholder="System prompt..." style="width:100%;min-height:70px;resize:vertical;margin-bottom:0"></textarea>
         <div id="promptSaveBar" style="display:flex;align-items:center;gap:6px">
-          <input type="text" id="promptTitle" placeholder="输入标题..." style="width:100px;padding:4px 6px;border:1px solid rgba(255,255,255,0.1);border-radius:4px;font-size:0.73rem;color:var(--text);background:rgba(255,255,255,0.04);outline:none;flex-shrink:0" onfocus="onTitleFocus()">
-          <button class="btn btn-sm btn-primary" id="btnSavePrompt" onclick="savePrompt()" style="flex-shrink:0">保存</button>
+          <input type="text" id="promptTitle" placeholder="输入标题..." style="width:100px;padding:4px 6px;border:1px solid rgba(255,255,255,0.1);border-radius:4px;font-size:0.73rem;color:var(--text);background:rgba(255,255,255,0.04);outline:none;flex-shrink:0">
+          <button class="btn btn-sm btn-primary" id="btnSavePrompt" style="flex-shrink:0">保存</button>
           <span style="font-size:0.7rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0" id="saveMsg"></span><span style="width:1px;height:16px;background:rgba(255,255,255,0.08);flex-shrink:0;margin:0 3px"></span>
           <div id="savedPrompts" style="display:flex;gap:4px;align-items:center;overflow-x:auto;flex-wrap:nowrap"></div>
           <span style="width:1px;height:16px;background:rgba(255,255,255,0.08);flex-shrink:0;margin:0 3px"></span>
-          <button class="btn btn-sm" onclick="exportPrompts()" title="导出所有自定义提示词" style="flex-shrink:0;font-size:0.68rem">📤</button>
-          <button class="btn btn-sm" onclick="importPrompts()" title="导入提示词" style="flex-shrink:0;font-size:0.68rem">📥</button>
+          <button class="btn btn-sm" title="导出所有自定义提示词" style="flex-shrink:0;font-size:0.68rem">📤</button>
+          <button class="btn btn-sm" title="导入提示词" style="flex-shrink:0;font-size:0.68rem">📥</button>
         </div>
       </div>
       <div id="polishStrategyRow" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px">
-        <textarea class="prompt-area visible" id="polish_strategy" placeholder="润色策略（Step2：对比糅合提示词）..." onchange="savePolishStrategy()" style="width:100%;min-height:70px;resize:vertical;margin-bottom:0"></textarea>
+        <textarea class="prompt-area visible" id="polish_strategy" placeholder="润色策略（Step2：对比糅合提示词）..." style="width:100%;min-height:70px;resize:vertical;margin-bottom:0"></textarea>
       </div>
       <div class="progress-wrap">
         <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
@@ -211,8 +211,8 @@
             <div class="manual-input" style="display:flex;align-items:stretch;gap:6px;margin-bottom:8px">
               <textarea id="tagManualInput" placeholder="手动输入，每行一条：原文=译文" style="flex:1"></textarea>
               <div style="display:flex;flex-direction:column;gap:4px">
-                <button class="btn btn-primary btn-sm" onclick="tagLoadManualInput()" style="flex:1">添加</button>
-                <button class="btn btn-sm" onclick="tagClearAll()" style="flex:1">重置</button>
+                <button class="btn btn-primary btn-sm" style="flex:1">添加</button>
+                <button class="btn btn-sm" style="flex:1">重置</button>
               </div>
             </div>
             <div class="drop-zone" id="tagDropZone">
@@ -228,16 +228,16 @@
           <div class="card-header">
             <div class="header-left">📋 源文本预览</div>
             <div class="search-wrap">
-              <select id="tagPreviewRowLimit" onchange="tagOnRowLimitChange()">
+              <select id="tagPreviewRowLimit">
                 <option value="2000">2000</option>
                 <option value="5000">5000</option>
                 <option value="-1">全部</option>
                 <option value="-2">自定</option>
               </select>
-              <input id="tagPreviewCustomLimit" type="number" min="1" placeholder="行数" onchange="tagOnCustomLimitChange()" class="preview-limit-input" style="display:none">
+              <input id="tagPreviewCustomLimit" type="number" min="1" placeholder="行数" class="preview-limit-input" style="display:none">
               <span class="search-count" id="tagPreviewCount">0 行</span>
-              <input class="search-input" id="tagSearch" placeholder="搜索..." oninput="tagOnSearch()">
-              <span class="search-clear" onclick="tagClearSearch()">×</span>
+              <input class="search-input" id="tagSearch" placeholder="搜索...">
+              <span class="search-clear">×</span>
             </div>
           </div>
           <div class="card-body" id="tagPreview">
@@ -251,19 +251,19 @@
     <div class="card tag-controls-row">
       <div class="card-header tag-ctrl-header">
       <span class="tag-ctrl-title">🏷️ 分词控制</span>
-      <span class="prompt-toggle" id="tagCatToggle" onclick="tagToggleCatPanel()">分类标签 ▼</span>
-      <span class="prompt-toggle" id="tagStrategyToggle" onclick="tagToggleStrategy()">分类策略 ▼</span>
-      <button class="btn btn-sm" onclick="tagOpenAdmin()">⚙️ 管理标签</button>
+      <span class="prompt-toggle" id="tagCatToggle">分类标签 ▼</span>
+      <span class="prompt-toggle" id="tagStrategyToggle">分类策略 ▼</span>
+      <button class="btn btn-sm">⚙️ 管理标签</button>
     </div>
       <div class="card-body tag-ctrl-body">
         <div id="tagCatPanel" class="tag-cat-panel">
         </div>
         <div class="tag-controls">
-          <button class="btn btn-primary" id="tagBtnStart" disabled onclick="tagStart()">开始分词</button>
-          <button class="btn" id="tagBtnStop" disabled onclick="tagStop()">停止</button>
-          <button class="btn" id="tagBtnClear" disabled onclick="tagClearAll()">清除全部</button>
-          <button class="btn" id="tagBtnExport" disabled onclick="tagExportDialog()">导出结果</button>
-          <button class="btn" id="tagBtnImport" onclick="tagImportDialog()">导入翻译</button>
+          <button class="btn btn-primary" id="tagBtnStart" disabled>开始分词</button>
+          <button class="btn" id="tagBtnStop" disabled>停止</button>
+          <button class="btn" id="tagBtnClear" disabled>清除全部</button>
+          <button class="btn" id="tagBtnExport" disabled>导出结果</button>
+          <button class="btn" id="tagBtnImport">导入翻译</button>
           <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px">并发</span>
           <input type="number" id="tagConcurrency" value="5" min="1" max="10" class="param-input" style="width:42px">
           <span id="tagRuntimeDisplay" style="display:none;font-size:0.72rem;color:var(--accent);margin-left:6px;font-variant-numeric:tabular-nums"></span>
@@ -277,10 +277,10 @@
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:0.73rem;color:var(--text-secondary);font-weight:600">① 角色指令</span>
-            <button class="btn btn-sm" onclick="resetTagStrategy()" title="恢复默认" style="padding:2px 6px;font-size:0.85rem">↻</button>
+            <button class="btn btn-sm" title="恢复默认" style="padding:2px 6px;font-size:0.85rem">↻</button>
             <div id="tagStrategyPresets" style="display:flex;gap:4px;align-items:center"></div>
           </div>
-          <textarea id="tagStrategyText" class="prompt-area visible" placeholder="角色指令..." style="width:100%;min-height:40px;resize:vertical;margin-bottom:0;font-size:0.72rem" oninput="saveTagStrategy()"></textarea>
+          <textarea id="tagStrategyText" class="prompt-area visible" placeholder="角色指令..." style="width:100%;min-height:40px;resize:vertical;margin-bottom:0;font-size:0.72rem"></textarea>
           <div style="font-size:0.68rem;color:var(--text-muted);line-height:1.4">
             <span style="color:var(--green)">② 类别列表</span> 和 <span style="color:var(--amber)">③ 输出格式</span> 会在每次分词时自动追加到角色指令之后，无需手动添加。
           </div>
@@ -332,26 +332,26 @@
       <div class="card-header">🔄 LLM 评估</div>
       <div class="card-body" id="cardDedupEval">
         <div class="dedup-controls">
-          <button class="btn" id="dedupBtnStop" disabled onclick="dedupStop()">停止</button>
+          <button class="btn" id="dedupBtnStop" disabled>停止</button>
           <span style="font-size:0.78rem;color:var(--text-muted)">并发</span>
-          <input type="number" id="dedupConcurrency" value="5" min="1" max="10" class="param-input" onchange="saveDedupParams()" style="width:42px">
-          <button class="btn btn-primary" id="dedupBtnStart" disabled onclick="dedupStart()">开始评估</button>
+          <input type="number" id="dedupConcurrency" value="5" min="1" max="10" class="param-input" style="width:42px">
+          <button class="btn btn-primary" id="dedupBtnStart" disabled>开始评估</button>
         </div>
         <div id="dedupEvalParams">
         <div class="param-row">
-          <label title="随机性：越低评估越稳定。去重建议低值&#10;双击恢复默认值 0.1" ondblclick="resetParamDefault(this.nextElementSibling)">Temperature</label>
-          <input type="number" id="dedupTemperature" value="0.1" min="0" max="2" step="0.1" class="param-input" onchange="saveDedupParams()">
-          <label title="核采样：限制候选词范围&#10;双击恢复默认值 0.6" ondblclick="resetParamDefault(this.nextElementSibling)">Top P</label>
-          <input type="number" id="dedupTopP" value="0.6" min="0" max="1" step="0.05" class="param-input" onchange="saveDedupParams()">
-          <label title="输出长度上限：去重只需输出序号&#10;双击恢复默认值 10" ondblclick="resetParamDefault(this.nextElementSibling)">Max Tokens</label>
-          <input type="number" id="dedupMaxTokens" value="10" min="1" max="128" class="param-input" onchange="saveDedupParams()">
-          <label title="重复惩罚&#10;双击恢复默认值 1.0" ondblclick="resetParamDefault(this.nextElementSibling)">Rep Penalty</label>
-          <input type="number" id="dedupRepPenalty" value="1.0" min="1" max="2" step="0.05" class="param-input" onchange="saveDedupParams()">
+          <label title="随机性：越低评估越稳定。去重建议低值&#10;双击恢复默认值 0.1">Temperature</label>
+          <input type="number" id="dedupTemperature" value="0.1" min="0" max="2" step="0.1" class="param-input">
+          <label title="核采样：限制候选词范围&#10;双击恢复默认值 0.6">Top P</label>
+          <input type="number" id="dedupTopP" value="0.6" min="0" max="1" step="0.05" class="param-input">
+          <label title="输出长度上限：去重只需输出序号&#10;双击恢复默认值 10">Max Tokens</label>
+          <input type="number" id="dedupMaxTokens" value="10" min="1" max="128" class="param-input">
+          <label title="重复惩罚&#10;双击恢复默认值 1.0">Rep Penalty</label>
+          <input type="number" id="dedupRepPenalty" value="1.0" min="1" max="2" step="0.05" class="param-input">
         </div>
         </div>
         <!-- 评估策略（结构化） -->
         <div style="margin-bottom:6px;text-align:right">
-          <span class="prompt-toggle" id="dedupStrategyToggle" onclick="toggleDedupStrategy()">评估策略 ▼</span>
+          <span class="prompt-toggle" id="dedupStrategyToggle">评估策略 ▼</span>
         </div>
         <div id="dedupStrategyRow" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px">
           <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;padding:6px 10px;background:rgba(0,0,0,0.15);border-radius:4px;border-left:3px solid var(--accent)">
@@ -362,9 +362,9 @@
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:0.73rem;color:var(--text-secondary);font-weight:600">① 角色指令</span>
-            <button class="btn btn-sm" onclick="resetDedupStrategy()" title="恢复默认" style="padding:2px 6px;font-size:0.85rem">↻</button>
+            <button class="btn btn-sm" title="恢复默认" style="padding:2px 6px;font-size:0.85rem">↻</button>
           </div>
-          <textarea id="dedupStrategyText" class="prompt-area visible" placeholder="角色指令..." style="width:100%;min-height:60px;resize:vertical;margin-bottom:0;font-size:0.72rem" oninput="saveDedupParams()"></textarea>
+          <textarea id="dedupStrategyText" class="prompt-area visible" placeholder="角色指令..." style="width:100%;min-height:60px;resize:vertical;margin-bottom:0;font-size:0.72rem"></textarea>
         </div>
         <div class="progress-wrap">
           <div class="progress-bar"><div class="progress-fill" id="dedupProgressFill"></div></div>
@@ -380,9 +380,9 @@
   <div class="card dedup-right">
     <div class="card-header">
       <div class="header-left">📊 重复组列表 <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted)">（每组单选保留条目，LLM 评估后自动勾选最优）</span></div>
-      <button class="dedup-nav-btn dedup-filter-off" id="dedupFilterBtn" onclick="_dedupToggleFilter()" title="仅显示译文不同的组（需评估）">🔍 筛选</button>
+      <button class="dedup-nav-btn dedup-filter-off" id="dedupFilterBtn" title="仅显示译文不同的组（需评估）">🔍 筛选</button>
       <span style="font-size:0.8rem;color:var(--text-muted)">已发现 <span id="dedupGroupCount">0</span> 组 · 已选 <span id="dedupSelectedCount">0</span> 条</span>
-      <button class="btn btn-primary" id="dedupApplyBtn" disabled onclick="applyDedup()" title="将选中的最佳条目导出为去重后的 zip 文件（含备份）">应用去重</button>
+      <button class="btn btn-primary" id="dedupApplyBtn" disabled title="将选中的最佳条目导出为去重后的 zip 文件（含备份）">应用去重</button>
     </div>
     <div class="card-body" id="dedupGroups" style="overflow-y:auto;flex:1">
       <div class="empty-state">上传文件后显示重复组</div>

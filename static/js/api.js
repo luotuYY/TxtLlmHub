@@ -377,12 +377,12 @@ function renderFileList() {
   for (var i = 0; i < state.files.length; i++) {
     var f = state.files[i];
     var lineCount = state.lines.filter(function (l) { return l.file === f.name; }).length;
-    html += '<div class="file-entry" draggable="true" data-file-index="' + i + '" ondragstart="onFileDragStart(event)" ondragover="onFileDragOver(event)" ondrop="onFileDrop(event)" ondragend="onFileDragEnd(event)">' +
-      '<input type="checkbox" class="file-check" ' + (f.checked ? 'checked' : '') + ' onchange="toggleFile(' + i + ')" title="勾选后该文件内容会出现在预览和翻译中">' +
+    html += '<div class="file-entry" draggable="true" data-file-index="' + i + '" data-action="file-drag-start" data-action="file-drag-over" data-action="file-drop" data-action="file-drag-end">' +
+      '<input type="checkbox" class="file-check" ' + (f.checked ? 'checked' : '') + ' data-action="toggle-file" data-index="' + i + '" title="勾选后该文件内容会出现在预览和翻译中">' +
       '<span class="file-name">' + escHtml(f.name) + '</span>' +
       '<span class="file-count">' + lineCount + ' 行</span>' +
       '<span class="file-drag-handle" title="拖动排序">≡</span>' +
-      '<span class="file-delete" onclick="deleteFile(' + i + '); event.stopPropagation()" title="删除此文件">🗑</span>' +
+      '<span class="file-delete" data-action="delete-file" data-index="' + i + '" title="删除此文件">🗑</span>' +
     '</div>';
   }
   $('fileInfo').innerHTML = html || '<div class="empty-state">暂无来源文件</div>';
@@ -612,19 +612,3 @@ function deletePreviewLine(index, e) {
 export { processFiles, loadManualInput, translateOneCore, enterTranslatingState, exitTranslatingState, translateBatchItems, renderFileList, deleteFile, toggleFile, onFileDragStart, onFileDragOver, onFileDragEnd, onFileDrop, resetSourceInput, deleteCheckedPreview, deletePreviewLine };
 
 // ── Window bindings (HTML onclick compat) ──
-window.processFiles = processFiles;
-window.loadManualInput = loadManualInput;
-window.translateOneCore = translateOneCore;
-window.enterTranslatingState = enterTranslatingState;
-window.exitTranslatingState = exitTranslatingState;
-window.translateBatchItems = translateBatchItems;
-window.renderFileList = renderFileList;
-window.deleteFile = deleteFile;
-window.toggleFile = toggleFile;
-window.onFileDragStart = onFileDragStart;
-window.onFileDragOver = onFileDragOver;
-window.onFileDragEnd = onFileDragEnd;
-window.onFileDrop = onFileDrop;
-window.resetSourceInput = resetSourceInput;
-window.deleteCheckedPreview = deleteCheckedPreview;
-window.deletePreviewLine = deletePreviewLine;

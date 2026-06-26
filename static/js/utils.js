@@ -204,16 +204,3 @@ function showConfirm(msg) {
 export { $, escHtml, escRegex, setHighlight, hl, matches, fallbackCopy, naturalCompare, showToast, logChunk, log, clearLog, showConfirm };
 
 // ── Window bindings (HTML onclick compat) ──
-window.$ = $;
-window.escHtml = escHtml;
-window.escRegex = escRegex;
-window.setHighlight = setHighlight;
-window.hl = hl;
-window.matches = matches;
-window.fallbackCopy = fallbackCopy;
-window.naturalCompare = naturalCompare;
-window.showToast = showToast;
-window.logChunk = logChunk;
-window.log = log;
-window.clearLog = clearLog;
-window.showConfirm = showConfirm;

@@ -162,8 +162,3 @@ function dbHas(key) {
 export { dbReady, dbGet, dbSet, dbDel, dbHas };
 
 // ── Window bindings ──
-window.dbReady = dbReady;
-window.dbGet = dbGet;
-window.dbSet = dbSet;
-window.dbDel = dbDel;
-window.dbHas = dbHas;

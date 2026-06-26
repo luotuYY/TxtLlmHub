@@ -59,11 +59,11 @@ function renderPreview() {
           (l.new_translation ? '<span class="sep">\u2192</span><span style="color:var(--green)">' + hl(l.new_translation) + '</span>' : '') +
         '</span>' +
         '<span class="line-actions">' +
-          '<button class="btn" onclick="deletePreviewLine(' + l.index + ', event)" title="删除此条目">🗑</button>' +
-          '<button class="btn" onclick="translateOne(' + l.index + ', event)" ' + (state.translating ? 'disabled' : '') + '>译</button>' +
+          '<button class="btn" data-action="delete-preview-line" data-index="' + l.index + '" title="删除此条目">🗑</button>' +
+          '<button class="btn" data-action="translate-one" data-index="' + l.index + '" ' + (state.translating ? 'disabled' : '') + '>译</button>' +
         '</span>' +
         '<span class="line-check-wrap">' +
-          '<input type="checkbox" class="preview-check" data-index="' + l.index + '" onclick="onPreviewCheck(this)" ' + (state.previewChecked.has(l.index) ? 'checked' : '') + '>' +
+          '<input type="checkbox" class="preview-check" data-index="' + l.index + '" data-action="preview-check" ' + (state.previewChecked.has(l.index) ? 'checked' : '') + '>' +
         '</span>' +
       '</div>';
     });
@@ -96,11 +96,11 @@ function updatePreviewLine(index) {
       (l.new_translation ? '<span class="sep">\u2192</span><span style="color:var(--green)">' + hl(l.new_translation) + '</span>' : '') +
     '</span>' +
     '<span class="line-actions">' +
-      '<button class="btn" onclick="deletePreviewLine(' + l.index + ', event)" title="删除此条目">🗑</button>' +
-      '<button class="btn" onclick="translateOne(' + l.index + ', event)" ' + (state.translating ? 'disabled' : '') + '>译</button>' +
+      '<button class="btn" data-action="delete-preview-line" data-index="' + l.index + '" title="删除此条目">🗑</button>' +
+      '<button class="btn" data-action="translate-one" data-index="' + l.index + '" ' + (state.translating ? 'disabled' : '') + '>译</button>' +
     '</span>' +
     '<span class="line-check-wrap">' +
-      '<input type="checkbox" class="preview-check" data-index="' + l.index + '" onclick="onPreviewCheck(this)" ' + (state.previewChecked.has(l.index) ? 'checked' : '') + '>' +
+      '<input type="checkbox" class="preview-check" data-index="' + l.index + '" data-action="preview-check" ' + (state.previewChecked.has(l.index) ? 'checked' : '') + '>' +
     '</span>';
 }
 
@@ -145,28 +145,28 @@ function renderCompare() {
       rows.sort(function (a, b) { return naturalCompare(a.new_translation || '', b.new_translation || ''); });
     }
     var compareHtml = '<table class="compare-table"><thead><tr>' +
-      '<th class="col-check"><input type="checkbox" id="selectAllCompare" onclick="toggleSelectAllCompare()" title="全选/取消筛选结果"></th>' +
+      '<th class="col-check"><input type="checkbox" id="selectAllCompare" data-action="toggle-select-all-compare" title="全选/取消筛选结果"></th>' +
       '<th class="col-orig">原文</th>' +
       '<th class="col-old">旧译文</th>' +
-      '<th class="col-new">新译文 <button class="btn btn-sm" onclick="clearNewWithoutOld()" title="清空所有无旧译文词条的新译文" style="font-size:0.68rem;padding:1px 6px">清</button></th>' +
+      '<th class="col-new">新译文 <button class="btn btn-sm" data-action="clear-new-without-old" title="清空所有无旧译文词条的新译文" style="font-size:0.68rem;padding:1px 6px">清</button></th>' +
       '<th class="col-actions"></th>' +
     '</tr></thead><tbody>';
     rows.forEach(function (l) {
       var rowCls = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
       compareHtml += '<tr class="' + rowCls + '" data-row-index="' + l.index + '">' +
-        '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" onclick="onCompareCheck(this)" ' + (state.compareChecked.has(l.index) ? 'checked' : '') + '></td>' +
-        '<td class="cell-copyable" onclick="copyOriginal(event)" title="点击复制">' + hl(l.original) + '</td>' +
+        '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" data-action="compare-check" ' + (state.compareChecked.has(l.index) ? 'checked' : '') + '></td>' +
+        '<td class="cell-copyable" data-action="copy-original" title="点击复制">' + hl(l.original) + '</td>' +
         '<td>' + (l.translation ? hl(l.translation) : '\u2014') + '</td>' +
-        '<td class="cell-editable" onclick="editTranslation(' + l.index + ',event)" title="' + (l.warning ? l.warning : '点击编辑') + '">' +
+        '<td class="cell-editable" data-action="edit-translation" data-index="' + l.index + '" title="' + (l.warning ? l.warning : '点击编辑') + '">' +
           (l.error ? '\u26A0' + escHtml(l.error) : l.new_translation === ' ' ? '<span class="cleared-mark">\u2014</span>' : hl(l.new_translation)) +
           (l.truncated ? ' <span title="响应被截断，翻译可能不完整" style="cursor:help">\u26A0\uFE0F</span>' : '') +
           (l.warning && !l.truncated ? ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>' : '') +
           (l.degraded ? ' <span title="无旧译文，已降级为直译" style="cursor:help;color:var(--text-muted)">↓</span>' : '') +
         '</td>' +
         '<td class="col-actions">' +
-          '<button class="btn btn-sm" onclick="keepOld(' + l.index + ')" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
-          '<button class="btn btn-sm" onclick="retryOne(' + l.index + ', event)">重译</button>' +
-          '<button class="btn btn-sm" onclick="copyRow(' + l.index + ')" title="复制原文=译文">复制</button>' +
+          '<button class="btn btn-sm" data-action="keep-old" data-index="' + l.index + '" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
+          '<button class="btn btn-sm" data-action="retry-one" data-index="' + l.index + '">重译</button>' +
+          '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=译文">复制</button>' +
         '</td>' +
       '</tr>';
     });
@@ -322,10 +322,10 @@ function _appendCompareRow(l) {
   if (!table) {
     // 表格不存在，创建骨架
     $('cardCompare').innerHTML = '<table class="compare-table"><thead><tr>' +
-      '<th class="col-check"><input type="checkbox" id="selectAllCompare" onclick="toggleSelectAllCompare()" title="全选/取消筛选结果"></th>' +
+      '<th class="col-check"><input type="checkbox" id="selectAllCompare" data-action="toggle-select-all-compare" title="全选/取消筛选结果"></th>' +
       '<th class="col-orig">原文</th>' +
       '<th class="col-old">旧译文</th>' +
-      '<th class="col-new">新译文 <button class="btn btn-sm" onclick="clearNewWithoutOld()" title="清空所有无旧译文词条的新译文" style="font-size:0.68rem;padding:1px 6px">清</button></th>' +
+      '<th class="col-new">新译文 <button class="btn btn-sm" data-action="clear-new-without-old" title="清空所有无旧译文词条的新译文" style="font-size:0.68rem;padding:1px 6px">清</button></th>' +
       '<th class="col-actions"></th>' +
     '</tr></thead><tbody></tbody></table>';
     tbody = document.querySelector('.compare-table tbody');
@@ -348,14 +348,14 @@ function _appendCompareRow(l) {
   tr.className = rowCls;
   tr.setAttribute('data-row-index', l.index);
   tr.innerHTML =
-    '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" onclick="onCompareCheck(this)"></td>' +
-    '<td class="cell-copyable" onclick="copyOriginal(event)" title="点击复制">' + hl(l.original) + '</td>' +
+    '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" data-action="compare-check"></td>' +
+    '<td class="cell-copyable" data-action="copy-original" title="点击复制">' + hl(l.original) + '</td>' +
     '<td>' + (l.translation ? hl(l.translation) : '\u2014') + '</td>' +
-    '<td class="cell-editable col-new" onclick="editTranslation(' + l.index + ',event)" title="' + (l.warning || '点击编辑') + '">' + newContent + '</td>' +
+    '<td class="cell-editable col-new" data-action="edit-translation" data-index="' + l.index + '" title="' + (l.warning || '点击编辑') + '">' + newContent + '</td>' +
     '<td class="col-actions">' +
-      '<button class="btn btn-sm" onclick="keepOld(' + l.index + ')" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
-      '<button class="btn btn-sm" onclick="retryOne(' + l.index + ', event)">重译</button>' +
-      '<button class="btn btn-sm" onclick="copyRow(' + l.index + ')" title="复制原文=译文">复制</button>' +
+      '<button class="btn btn-sm" data-action="keep-old" data-index="' + l.index + '" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
+      '<button class="btn btn-sm" data-action="retry-one" data-index="' + l.index + '">重译</button>' +
+      '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=译文">复制</button>' +
     '</td>';
   tbody.appendChild(tr);
 }
@@ -446,25 +446,3 @@ function setBatchUpdating(v) { _batchUpdating = v; }
 export { renderInternal, getCheckedFileNames, updateSearchUI, renderPreview, updatePreviewLine, toggleSort, renderCompare, updatePreviewSelectAllVisibility, onPreviewCheck, toggleSelectAllPreview, updateSelectAllPreview, getCheckedPreviewIndices, onCompareCheck, toggleSelectAllCompare, updateSelectAllCompare, getCheckedRows, onPreviewRowLimitChange, onPreviewCustomLimitChange, initPreviewRowLimit, updateCompareRow, _appendCompareRow, setBatchUpdating };
 
 // ── Window bindings (HTML onclick compat) ──
-window.updateSearchUI = updateSearchUI;
-window.renderPreview = renderPreview;
-window.updatePreviewLine = updatePreviewLine;
-window.toggleSort = toggleSort;
-window.renderCompare = renderCompare;
-window.updatePreviewSelectAllVisibility = updatePreviewSelectAllVisibility;
-window.onPreviewCheck = onPreviewCheck;
-window.toggleSelectAllPreview = toggleSelectAllPreview;
-window.updateSelectAllPreview = updateSelectAllPreview;
-window.getCheckedPreviewIndices = getCheckedPreviewIndices;
-window.onCompareCheck = onCompareCheck;
-window.toggleSelectAllCompare = toggleSelectAllCompare;
-window.updateSelectAllCompare = updateSelectAllCompare;
-window.getCheckedRows = getCheckedRows;
-window.onPreviewRowLimitChange = onPreviewRowLimitChange;
-window.onPreviewCustomLimitChange = onPreviewCustomLimitChange;
-window.initPreviewRowLimit = initPreviewRowLimit;
-window.updateCompareRow = updateCompareRow;
-window._appendCompareRow = _appendCompareRow;
-window.renderInternal = renderInternal;
-window.getCheckedFileNames = getCheckedFileNames;
-window.setBatchUpdating = setBatchUpdating;

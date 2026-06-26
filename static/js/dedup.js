@@ -186,7 +186,7 @@ function renderGroups() {
       if (bestIdx == null) bestIdx = -1;
 
       html += '<div class="dedup-group" data-group="' + gIdx + '">';
-      html += '<div class="dedup-group-header" onclick="toggleDedupGroup(this)">';
+      html += '<div class="dedup-group-header" data-action="toggle-group">';
       html += '  <span class="dedup-group-toggle">▼</span>';
       html += '  <span class="dedup-group-original">' + escHtml(key) + "</span>";
       html += '  <span class="dedup-group-count">' + entries.length + " 条</span>";
@@ -206,7 +206,7 @@ function renderGroups() {
           '<div class="dedup-row' + rowClass +
           '" data-group="' + gIdx +
           '" data-idx="' + idx +
-          '" onclick="window._dedupSelect(\'' + gIdx + "', " + idx + ')">';
+          '" data-action="select-row">';
         html += '  <span class="dedup-row-original">' + escHtml(e.original) + "</span>";
         html += '  <span class="dedup-row-trans">' + escHtml(e.translation) + "</span>";
         html += '  <span class="dedup-row-file">' + escHtml(e.file) + "</span>";
@@ -238,7 +238,6 @@ function _dedupSelect(gIdx, idx) {
     _updateGroupDOM(key, gIdx);
     updateSelectedCount();
 }
-window._dedupSelect = _dedupSelect;
 
 function toggleDedupGroup(el) {
     var body = el.nextElementSibling;
@@ -251,7 +250,6 @@ function toggleDedupGroup(el) {
       toggle.textContent = "▶";
     }
 }
-window.toggleDedupGroup = toggleDedupGroup;
 
 function updateSelectedCount() {
     var count = 0;
@@ -786,22 +784,38 @@ function init() {
     var la = $("dedupLogArea");
     if (la) la.style.display = "none";
     renderGroups();
-}
 
-window.dedupInit = init;
-var dedupInit = init;
-window.dedupStart = dedupStart;
-window.dedupStop = dedupStop;
-window.applyDedup = applyDedup;
-window.saveDedupParams = saveDedupParams;
-window.toggleDedupStrategy = toggleDedupStrategy;
-window.resetDedupStrategy = resetDedupStrategy;
-window._dedupToggleFilter = _dedupToggleFilter;
+    // ── 事件绑定 ──
+    var groups = $("dedupGroups");
+    if (groups) {
+      groups.addEventListener("click", function(e) {
+        var row = e.target.closest(".dedup-row[data-action='select-row']");
+        if (row) {
+          _dedupSelect(parseInt(row.dataset.group), parseInt(row.dataset.idx));
+          return;
+        }
+        var header = e.target.closest(".dedup-group-header[data-action='toggle-group']");
+        if (header) toggleDedupGroup(header);
+      });
+    }
+
+    var _bind = function(id, fn) { var el = $(id); if (el) el.addEventListener("click", fn); };
+    _bind("dedupBtnStart", dedupStart);
+    _bind("dedupBtnStop", dedupStop);
+    _bind("dedupApplyBtn", applyDedup);
+    _bind("dedupFilterBtn", _dedupToggleFilter);
+    _bind("dedupStrategyToggle", toggleDedupStrategy);
+    _bind("dedupStrategyReset", resetDedupStrategy);
+
+    var _bindChange = function(id, fn) { var el = $(id); if (el) el.addEventListener("change", fn); };
+    _bindChange("dedupTemperature", saveDedupParams);
+    _bindChange("dedupTopP", saveDedupParams);
+    _bindChange("dedupMaxTokens", saveDedupParams);
+    _bindChange("dedupRepPenalty", saveDedupParams);
+    _bindChange("dedupConcurrency", saveDedupParams);
+}
 
 
 // ── Module exports ──
-export {
-  dedupInit, dedupStart, dedupStop, applyDedup,
-  saveDedupParams, toggleDedupStrategy, resetDedupStrategy,
-  toggleDedupGroup, _dedupSelect, _dedupToggleFilter
-};
+var dedupInit = init;
+export { dedupInit };

@@ -9,14 +9,25 @@ import { $, escHtml, showToast, log, naturalCompare, fallbackCopy } from './util
 import { state, rebuildIndicesAndCheckboxes, PRESET_PROMPTS, 
           updateTranslateAllButton, updateRetryButton, updateExportCheckedButton,
           getLLMParams, getApiConfig, checkLLM } from './state.js';
-import { processFiles } from './api.js';
+import { processFiles, deleteFile, toggleFile, deletePreviewLine, onFileDragStart, onFileDragOver, onFileDrop, onFileDragEnd } from './api.js';
 import { renderInternal, getCheckedFileNames, renderPreview, renderCompare, updateSearchUI,
           updateCompareRow, updatePreviewLine, updatePreviewSelectAllVisibility,
-          getCheckedPreviewIndices, getCheckedRows, onPreviewCheck,
-          updateSelectAllPreview, updateSelectAllCompare } from './render.js';
+          getCheckedPreviewIndices, getCheckedRows, onPreviewCheck, onCompareCheck,
+          updateSelectAllPreview, updateSelectAllCompare, toggleSelectAllCompare } from './render.js';
 import { translateOneCore, translateBatchItems,
           enterTranslatingState, exitTranslatingState,
-          renderFileList } from './api.js';
+          renderFileList, loadManualInput, resetSourceInput, deleteCheckedPreview, deletePreviewLine } from './api.js';
+import { setProvider, setMode, saveModeParams, saveApiConfig, testApiConnection,
+          onThinkingChange, togglePrompt, resetSystemPrompt,
+          togglePolishStrategy, savePolishStrategy, resetPolishStrategy,
+          onTitleFocus, savePrompt, loadSavedPrompt, deletePrompt,
+          exportPrompts, importPrompts, resetParamDefault } from './state.js';
+import { onPreviewRowLimitChange, onPreviewCustomLimitChange, initPreviewRowLimit, toggleSort } from './render.js';
+import { tagInit, tagLoadManualInput, tagClearAll, tagOnSearch, tagOnRowLimitChange, tagOnCustomLimitChange,
+          tagStart, tagStop, tagExportDialog, tagImportDialog, tagToggleCatPanel, tagToggleStrategy,
+          tagOpenAdmin, tagToggleCollapse, resetTagStrategy, saveTagStrategy } from './tag.js';
+import { dedupInit, dedupStart, dedupStop, saveDedupParams, toggleDedupStrategy,
+          resetDedupStrategy, _dedupToggleFilter, applyDedup } from './dedup.js';
 // ── Constants ──
 var NL = '\n';
 var _exportGroups = null;
@@ -60,13 +71,13 @@ function switchPage(page) {
   // 分词页懒初始化
   if (page === 'tag' && !_tagInited) {
     _tagInited = true;
-    window.tagInit();
+    tagInit();
   }
 
   // 去重页懒初始化
   if (page === 'dedup' && !_dedupInited) {
     _dedupInited = true;
-    if (typeof window.dedupInit === 'function') window.dedupInit();
+    dedupInit();
   }
 
   // 切换时刷新 LLM 状态
@@ -698,16 +709,102 @@ function triggerDownload(filename, fcontent) {
 
 // ── 事件监听初始化 ──
 (function () {
+  // Helper
+  var _bind = function(id, evt, fn) { var el = $(id); if (el) el.addEventListener(evt, fn); };
+
+  // ── 翻译页：静态按钮 ──
+  _bind('btnTranslateAll', 'click', translateAll);
+  _bind('btnClearAll', 'click', clearAllTranslations);
+  _bind('btnRetryFailed', 'click', retryFailed);
+  _bind('btnStop', 'click', stopTranslate);
+  _bind('btnSort', 'click', toggleSort);
+  _bind('btnRetrySelected', 'click', retrySelected);
+  _bind('btnCopySelected', 'click', copySelectedRows);
+  _bind('btnDeleteSelected', 'click', deleteSelectedRows);
+  _bind('btnExportChecked', 'click', exportCheckedRows);
+  _bind('btnExport', 'click', exportFile);
+  _bind('btnManualInput', 'click', loadManualInput);
+  _bind('btnTranslatePreviewSel', 'click', translatePreviewSelected);
+
+  // ── 翻译页：搜索 ──
+  var ps = $('previewSearch'); if (ps) ps.addEventListener('input', onPreviewSearch);
+  _bind('previewSearch', 'input', onPreviewSearch);
+  var cs = $('compareSearch'); if (cs) cs.addEventListener('input', onCompareSearch);
+
+  // ── 翻译页：导出下拉 ──
+  var exportBtns = document.querySelectorAll('#exportOptions .btn');
+  for (var ei = 0; ei < exportBtns.length; ei++) {
+    var txt = exportBtns[ei].textContent.trim();
+    if (txt === '分别导出') exportBtns[ei].addEventListener('click', exportSeparate);
+    else if (txt === '合并导出') exportBtns[ei].addEventListener('click', exportGrouped);
+    else if (txt === '取消') exportBtns[ei].addEventListener('click', cancelExport);
+  }
+
+  // ── 翻译页：模式/参数 ──
+  _bind('btnModeDirect', 'click', function() { setMode('direct'); });
+  _bind('btnModePolish', 'click', function() { setMode('polish'); });
+  _bind('btnLocal', 'click', function() { setProvider('local'); });
+  _bind('btnCommercial', 'click', function() { setProvider('commercial'); });
+  _bind('promptToggle', 'click', togglePrompt);
+  _bind('polishStrategyToggle', 'click', togglePolishStrategy);
+  _bind('btnSavePrompt', 'click', savePrompt);
+
+  // ── 翻译页：参数输入 ──
+  var paramMap = ['temperature','top_p','max_tokens','repetition_penalty','concurrency'];
+  paramMap.forEach(function(id) { _bind(id, 'change', function() { saveModeParams(state.translateMode); }); });
+  _bind('system_prompt', 'change', function() { saveModeParams(state.translateMode); });
+  _bind('polish_strategy', 'change', savePolishStrategy);
+
+  // ── 翻译页：API 配置 ──
+  ['apiBase','apiKey','modelName'].forEach(function(id) { _bind(id, 'input', saveApiConfig); });
+  _bind('enableThinking', 'change', function() { onThinkingChange(); saveApiConfig(); });
+
+  // ── 翻译页：预览行数 ──
+  _bind('previewRowLimit', 'change', onPreviewRowLimitChange);
+  _bind('previewCustomLimit', 'change', onPreviewCustomLimitChange);
+
+  // ── 翻译页：双击恢复默认参数 ──
+  document.querySelectorAll('.param-row label + input[type="number"]').forEach(function(input) {
+    input.addEventListener('dblclick', function() { resetParamDefault(input); });
+  });
+
+  // ── 翻译页：提示词管理 ──
+  _bind('promptTitle', 'focus', onTitleFocus);
+  var sp = $('savedPrompts');
+  if (sp) {
+    sp.addEventListener('click', function(e) {
+      var chip = e.target.closest('.prompt-chip');
+      if (!chip) return;
+      var del = e.target.closest('.chip-del');
+      if (del) { deletePrompt(parseInt(chip.dataset.id)); return; }
+      if (chip.dataset.id) loadSavedPrompt(chip.dataset.id);
+    });
+  }
+  var promptBtns = document.querySelectorAll('#promptSaveBar .btn-sm');
+  promptBtns.forEach(function(btn) {
+    var txt = btn.textContent.trim();
+    if (txt === '导出') btn.addEventListener('click', exportPrompts);
+    if (txt === '导入') btn.addEventListener('click', importPrompts);
+  });
+  // promptToggle 和 resetSystemPrompt 按钮紧邻
+  var pt = $('promptToggle');
+  if (pt && pt.nextElementSibling && pt.nextElementSibling.textContent.trim() === '↻') {
+    pt.nextElementSibling.addEventListener('click', resetSystemPrompt);
+  }
+  var pst = $('polishStrategyToggle');
+  if (pst && pst.nextElementSibling && pst.nextElementSibling.textContent.trim() === '↻') {
+    pst.nextElementSibling.addEventListener('click', resetPolishStrategy);
+  }
+
+  // ── 翻译页：来源输入 ──
   var dropZone = $('dropZone');
   var fileInput = $('fileInput');
-
   if (dropZone && fileInput) {
     dropZone.addEventListener('dragover', function (e) { e.preventDefault(); dropZone.classList.add('drag-over'); });
     dropZone.addEventListener('dragleave', function () { dropZone.classList.remove('drag-over'); });
     dropZone.addEventListener('click', function () { fileInput.click(); });
     dropZone.addEventListener('drop', function (e) {
-      e.preventDefault();
-      dropZone.classList.remove('drag-over');
+      e.preventDefault(); dropZone.classList.remove('drag-over');
       var files = e.dataTransfer.files;
       if (files && files.length > 0) processFiles(files);
     });
@@ -716,16 +813,129 @@ function triggerDownload(filename, fcontent) {
       if (files && files.length > 0) processFiles(files);
     });
   }
+  // 来源输入按钮
+  document.querySelectorAll('#page-translate .manual-input .btn').forEach(function(btn) {
+    var txt = btn.textContent.trim();
+    if (txt === '加载') btn.addEventListener('click', loadManualInput);
+    if (txt === '重置') btn.addEventListener('click', resetSourceInput);
+  });
 
-  // 延迟初始化（所有模块已加载）
+  // ── 翻译页：搜索清除 ──
+  document.querySelectorAll('.search-clear').forEach(function(el) {
+    el.addEventListener('click', function() {
+      var wrap = el.closest('.search-wrap');
+      if (!wrap) return;
+      var input = wrap.querySelector('.search-input');
+      if (input && input.id === 'previewSearch') clearPreviewSearch();
+      else if (input && input.id === 'compareSearch') clearCompareSearch();
+    });
+  });
+
+  // ── 翻译页：全选/删除预览 ──
+  _bind('selectAllPreview', 'click', toggleSelectAllPreview);
+  var previewCard = $('cardPreview');
+  if (previewCard) {
+    var previewHeader = previewCard.previousElementSibling;
+    if (previewHeader) {
+      previewHeader.querySelectorAll('.btn-sm').forEach(function(btn) {
+        if (btn.title && btn.title.indexOf('删除') >= 0) btn.addEventListener('click', deleteCheckedPreview);
+      });
+    }
+  }
+
+  // ── 翻译页：预览列表事件委托 ──
+  var previewBody = $('cardPreview');
+  if (previewBody) {
+    previewBody.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      var action = btn.dataset.action;
+      var idx = parseInt(btn.dataset.index);
+      if (action === 'delete-preview-line') deletePreviewLine(idx, e);
+      else if (action === 'translate-one') translateOne(idx, e);
+      else if (action === 'preview-check') onPreviewCheck(btn);
+    });
+  }
+
+  // ── 翻译页：对比表事件委托 ──
+  var compareBody = $('cardCompare');
+  if (compareBody) {
+    compareBody.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-action]');
+      var td = e.target.closest('[data-action]');
+      var target = btn || td;
+      if (!target) return;
+      var action = target.dataset.action;
+      var idx = parseInt(target.dataset.index);
+      if (action === 'compare-check') onCompareCheck(target);
+      else if (action === 'copy-original') copyOriginal(e);
+      else if (action === 'edit-translation') editTranslation(idx, e);
+      else if (action === 'keep-old') keepOld(idx);
+      else if (action === 'retry-one') retryOne(idx, e);
+      else if (action === 'copy-row') copyRow(idx);
+      else if (action === 'clear-new-without-old') clearNewWithoutOld();
+      else if (action === 'toggle-select-all-compare') toggleSelectAllCompare();
+    });
+  }
+
+  // ── 翻译页：文件列表事件委托 ──
+  var fileInfo = $('fileInfo');
+  if (fileInfo) {
+    fileInfo.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      var action = btn.dataset.action;
+      var idx = parseInt(btn.dataset.index);
+      if (action === 'delete-file') { deleteFile(idx); e.stopPropagation(); }
+      else if (action === 'toggle-file') toggleFile(idx);
+    });
+    fileInfo.addEventListener('dragstart', function(e) {
+      var el = e.target.closest('[data-action="file-drag-start"]');
+      if (el) onFileDragStart(e);
+    });
+    fileInfo.addEventListener('dragover', function(e) {
+      var el = e.target.closest('[data-action="file-drag-over"]');
+      if (el) { e.preventDefault(); onFileDragOver(e); }
+    });
+    fileInfo.addEventListener('drop', function(e) {
+      e.preventDefault();
+      var el = e.target.closest('[data-action="file-drop"]');
+      if (el) onFileDrop(e);
+    });
+    fileInfo.addEventListener('dragend', function(e) {
+      var el = e.target.closest('[data-action="file-drag-end"]');
+      if (el) onFileDragEnd(e);
+    });
+  }
+
+  // ── 翻译页：提示词事件委托 ──
+  var savedPrompts = $('savedPrompts');
+  if (savedPrompts) {
+    savedPrompts.addEventListener('click', function(e) {
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'load-saved-prompt') loadSavedPrompt(el.dataset.id);
+      else if (action === 'delete-prompt') { deletePrompt(parseInt(el.dataset.id)); e.stopPropagation(); }
+    });
+  }
+
+  // ── 导航 ──
+  _bind('navTranslate', 'click', function(e) { e.preventDefault(); switchPage('translate'); });
+  _bind('navTag', 'click', function(e) { e.preventDefault(); switchPage('tag'); });
+  _bind('navDedup', 'click', function(e) { e.preventDefault(); switchPage('dedup'); });
+
+  // ── 工具栏 ──
+  _bind('tagCollapseBar', 'click', tagToggleCollapse);
+
+  // ── 延迟初始化 ──
   setTimeout(function () { initPreviewRowLimit(); }, 0);
 
   // ── Document-level: click-outside-to-close ──
   document.addEventListener('click', function (e) {
-    // 导出选项下拉框：点击外部关闭
     var exportOpts = $('exportOptions');
     if (exportOpts && exportOpts.classList.contains('visible')) {
-      if (!e.target.closest('#exportOptions') && !e.target.closest('[onclick*="exportFile"]') && !e.target.closest('[onclick*="exportCheckedRows"]')) {
+      if (!e.target.closest('#exportOptions') && !e.target.closest('#btnExport') && !e.target.closest('#btnExportChecked')) {
         cancelExport();
       }
     }
@@ -734,26 +944,14 @@ function triggerDownload(filename, fcontent) {
   // ── Document-level: Escape 键关闭弹窗 ──
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
-      // 关闭确认弹窗（showConfirm 已有独立处理，此处仅处理未被 showConfirm 管理的情况）
       var confirm = $('confirmModal');
-      if (confirm && confirm.style.display === 'flex' && !window._showConfirmActive) {
-        confirm.style.display = 'none';
-      }
-      // 关闭标签编辑弹窗
+      if (confirm && confirm.style.display === 'flex' && !window._showConfirmActive) confirm.style.display = 'none';
       var tagEdit = document.getElementById('tagEditModal');
-      if (tagEdit && tagEdit.style.display === 'flex') {
-        tagEdit.style.display = 'none';
-      }
-      // 关闭标签管理弹窗
+      if (tagEdit && tagEdit.style.display === 'flex') tagEdit.style.display = 'none';
       var tagAdmin = document.getElementById('tagAdminModal');
-      if (tagAdmin && tagAdmin.style.display === 'flex') {
-        tagAdmin.style.display = 'none';
-      }
-      // 关闭导出选项
+      if (tagAdmin && tagAdmin.style.display === 'flex') tagAdmin.style.display = 'none';
       var exportOpts = $('exportOptions');
-      if (exportOpts && exportOpts.classList.contains('visible')) {
-        cancelExport();
-      }
+      if (exportOpts && exportOpts.classList.contains('visible')) cancelExport();
     }
   });
 
@@ -761,44 +959,12 @@ function triggerDownload(filename, fcontent) {
   var confirmModal = $('confirmModal');
   if (confirmModal) {
     confirmModal.addEventListener('click', function (e) {
-      if (e.target === confirmModal) {
-        confirmModal.style.display = 'none';
-      }
+      if (e.target === confirmModal) confirmModal.style.display = 'none';
     });
   }
 })();
 
 // ── Module exports ──
-export { switchPage, onPreviewSearch, clearPreviewSearch, onCompareSearch, clearCompareSearch, translateOne, translatePreviewSelected, translateAll, retryFailed, retrySelected, clearAllTranslations, stopTranslate, retryOne, copySelectedRows, deleteSelectedRows, copyRow, editTranslation, commitEditTA, autoResizeTA, clearNewWithoutOld, keepOld, copyOriginal, exportCheckedRows, exportFile, cancelExport, doExportSingle, exportSeparate, exportGrouped, buildFileContent, triggerDownload };
+export { switchPage };
 
 // ── Window bindings (HTML onclick compat) ──
-window.switchPage = switchPage;
-window.onPreviewSearch = onPreviewSearch;
-window.clearPreviewSearch = clearPreviewSearch;
-window.onCompareSearch = onCompareSearch;
-window.clearCompareSearch = clearCompareSearch;
-window.translateOne = translateOne;
-window.translatePreviewSelected = translatePreviewSelected;
-window.translateAll = translateAll;
-window.retryFailed = retryFailed;
-window.retrySelected = retrySelected;
-window.clearAllTranslations = clearAllTranslations;
-window.stopTranslate = stopTranslate;
-window.retryOne = retryOne;
-window.copySelectedRows = copySelectedRows;
-window.deleteSelectedRows = deleteSelectedRows;
-window.copyRow = copyRow;
-window.editTranslation = editTranslation;
-window.commitEditTA = commitEditTA;
-window.autoResizeTA = autoResizeTA;
-window.clearNewWithoutOld = clearNewWithoutOld;
-window.keepOld = keepOld;
-window.copyOriginal = copyOriginal;
-window.exportCheckedRows = exportCheckedRows;
-window.exportFile = exportFile;
-window.cancelExport = cancelExport;
-window.doExportSingle = doExportSingle;
-window.exportSeparate = exportSeparate;
-window.exportGrouped = exportGrouped;
-window.buildFileContent = buildFileContent;
-window.triggerDownload = triggerDownload;
