@@ -904,11 +904,15 @@ async function init() {
         }
       });
     }
-    // 去重页并发数双击重置
+    // 去重页并发数：双击 span 恢复默认
     var dedupConcurrencyEl = document.getElementById('dedupConcurrency');
     if (dedupConcurrencyEl) {
-      dedupConcurrencyEl.addEventListener('dblclick', function() {
-        resetInputDefault(dedupConcurrencyEl, saveDedupParams);
+      var concLabel = dedupConcurrencyEl.previousElementSibling;
+      if (concLabel && concLabel.tagName === 'SPAN') {
+        concLabel.addEventListener('dblclick', function() {
+          resetInputDefault(dedupConcurrencyEl, saveDedupParams);
+        });
+      }
       });
     }
 }

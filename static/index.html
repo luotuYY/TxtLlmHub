@@ -145,17 +145,17 @@
           <button class="btn btn-sm segmented-btn active" id="btnModeDirect">直译</button>
           <button class="btn btn-sm segmented-btn" id="btnModePolish">润色</button>
         </span>
-        <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px">并发</span>
+        <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px;cursor:pointer" title="同时发送的翻译请求数。越大越快，但可能触发限流或 OOM&#10;推荐 3~5，商业 API 建议 ≤3&#10;双击恢复默认">并发</span>
         <input type="number" id="concurrency" value="5" min="1" max="10" class="param-input" style="width:42px">
       </div>
       <div class="param-row">
-        <label title="随机性：越高译文越多变、越丰富；越低越稳定、越保守。&#10;0=完全确定，2=极度随机&#10;双击恢复默认">Temperature</label>
+        <label title="译文的用词随机性。越高越多样、越有创意；越低越稳定、越保守&#10;0=完全确定，2=极度随机&#10;UI/术语翻译推荐 0.3~0.5，对话/剧情推荐 0.7~1.0&#10;双击恢复默认">Temperature</label>
         <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" class="param-input">
-        <label title="核采样：限制候选词范围。越低越保守，越高越多样。&#10;取 1=不限制，取 0.5=只考虑前 50% 概率的候选词&#10;双击恢复默认">Top P</label>
+        <label title="核采样：从概率累积前 P% 的候选词中采样，限制用词范围&#10;1=不限制，0.5=只从概率前50%的词中选&#10;越低译文越保守，越高越多样&#10;双击恢复默认">Top P</label>
         <input type="number" id="top_p" value="0.6" min="0" max="1" step="0.05" class="param-input">
-        <label title="输出长度上限：限制每次翻译的最大输出量。&#10;设太小可能截断长句，设太大拖慢速度。&#10;双击恢复默认">Max Tokens</label>
+        <label title="单次翻译的最大输出 token 数。太小会截断长句，太大拖慢速度&#10;一般 512~1024 足够，超长文本可适当增大&#10;双击恢复默认">Max Tokens</label>
         <input type="number" id="max_tokens" value="1024" min="1" max="4096" class="param-input">
-        <label title="重复惩罚：越高越避免重复用词，但过高可能导致用词不自然。&#10;取 1=不惩罚，1.05=轻微惩罚，1.2=明显惩罚&#10;双击恢复默认">Rep Penalty</label>
+        <label title="重复惩罚：抑制译文中重复出现的用词&#10;1.0=不惩罚，1.05=轻微惩罚（推荐），1.2+=明显惩罚&#10;过高可能导致用词不自然&#10;双击恢复默认">Rep Penalty</label>
         <input type="number" id="repetition_penalty" value="1.05" min="1" max="2" step="0.05" class="param-input">
         <span class="prompt-toggle" id="promptToggle" title="展开/折叠提示词">翻译提示词 ▼</span><button class="btn btn-sm" id="btnResetPrompt" title="恢复当前模式的默认提示词" style="padding:2px 6px;font-size:0.85rem;margin-left:4px">↻</button>
       </div>
@@ -250,13 +250,13 @@
           <button class="btn" id="tagBtnClear" disabled>清除全部</button>
           <button class="btn" id="tagBtnExport" disabled>导出结果</button>
           <button class="btn" id="tagBtnImport">导入翻译</button>
-          <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px;cursor:pointer" title="双击恢复默认">并发</span>
+          <span style="font-size:0.78rem;color:var(--text-muted);margin-left:4px;cursor:pointer" title="同时发送的分类请求数。越大越快，但可能触发限流&#10;推荐 3~5&#10;双击恢复默认">并发</span>
           <input type="number" id="tagConcurrency" value="5" min="1" max="10" class="param-input" style="width:42px">
-          <span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px;cursor:pointer" title="分词建议低温度（0.1），双击恢复默认">Temp</span>
+          <span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px;cursor:pointer" title="分类的随机性。越低分类越稳定、越一致&#10;分词建议低温度 0.1，保证每次分类结果一致&#10;双击恢复默认">Temp</span>
           <input type="number" id="tagTemperature" value="0.1" min="0" max="2" step="0.1" class="param-input" style="width:48px">
-          <span style="font-size:0.72rem;color:var(--text-muted);margin-left:4px;cursor:pointer" title="双击恢复默认">Top P</span>
+          <span style="font-size:0.72rem;color:var(--text-muted);margin-left:4px;cursor:pointer" title="核采样：限制候选词范围&#10;分词场景影响极小，保持默认即可&#10;双击恢复默认">Top P</span>
           <input type="number" id="tagTopP" value="0.6" min="0" max="1" step="0.05" class="param-input" style="width:48px">
-          <span style="font-size:0.72rem;color:var(--text-muted);margin-left:4px;cursor:pointer" title="双击恢复默认">Max</span>
+          <span style="font-size:0.72rem;color:var(--text-muted);margin-left:4px;cursor:pointer" title="最大输出 token 数。分词只需输出类别 JSON，512 足够&#10;双击恢复默认">Max</span>
           <input type="number" id="tagMaxTokens" value="512" min="1" max="4096" class="param-input" style="width:52px">
           <span id="tagRuntimeDisplay" style="display:none;font-size:0.72rem;color:var(--accent);margin-left:6px;font-variant-numeric:tabular-nums"></span>
         </div>
@@ -325,19 +325,19 @@
       <div class="card-body" id="cardDedupEval">
         <div class="dedup-controls">
           <button class="btn" id="dedupBtnStop" disabled>停止</button>
-          <span style="font-size:0.78rem;color:var(--text-muted)">并发</span>
+          <span style="font-size:0.78rem;color:var(--text-muted);cursor:pointer" title="同时评估的重复组数。越大越快，但可能触发限流&#10;推荐 3~5&#10;双击恢复默认">并发</span>
           <input type="number" id="dedupConcurrency" value="5" min="1" max="10" class="param-input" style="width:42px">
           <button class="btn btn-primary" id="dedupBtnStart" disabled>开始评估</button>
         </div>
         <div id="dedupEvalParams">
         <div class="param-row">
-          <label title="随机性：越低评估越稳定。去重建议低值&#10;双击恢复默认">Temperature</label>
+          <label title="评估的随机性。越低判断越稳定、越一致&#10;去重只需选序号，建议极低值 0.1&#10;双击恢复默认">Temperature</label>
           <input type="number" id="dedupTemperature" value="0.1" min="0" max="2" step="0.1" class="param-input">
-          <label title="核采样：限制候选词范围&#10;双击恢复默认">Top P</label>
+          <label title="核采样：限制候选词范围&#10;去重场景影响极小，保持默认即可&#10;双击恢复默认">Top P</label>
           <input type="number" id="dedupTopP" value="0.6" min="0" max="1" step="0.05" class="param-input">
-          <label title="输出长度上限：去重只需输出序号&#10;双击恢复默认">Max Tokens</label>
+          <label title="最大输出 token 数。去重只需输出一个序号，10 足够&#10;设太大浪费额度&#10;双击恢复默认">Max Tokens</label>
           <input type="number" id="dedupMaxTokens" value="10" min="1" max="128" class="param-input">
-          <label title="重复惩罚&#10;双击恢复默认">Rep Penalty</label>
+          <label title="重复惩罚。去重场景无需惩罚，保持 1.0&#10;双击恢复默认">Rep Penalty</label>
           <input type="number" id="dedupRepPenalty" value="1.0" min="1" max="2" step="0.05" class="param-input">
         </div>
         </div>

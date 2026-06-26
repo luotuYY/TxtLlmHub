@@ -775,12 +775,15 @@ function triggerDownload(filename, fcontent) {
       }
     });
   }
-  // 翻译页并发数双击重置
+  // 翻译页并发数：双击 span 恢复默认
   var concurrencyEl = document.getElementById('concurrency');
   if (concurrencyEl) {
-    concurrencyEl.addEventListener('dblclick', function() {
-      resetInputDefault(concurrencyEl, function() { dbSet('tllmh_concurrency', concurrencyEl.value); });
-    });
+    var concLabel = concurrencyEl.previousElementSibling;
+    if (concLabel && concLabel.tagName === 'SPAN') {
+      concLabel.addEventListener('dblclick', function() {
+        resetInputDefault(concurrencyEl, function() { dbSet('tllmh_concurrency', concurrencyEl.value); });
+      });
+    }
     // 持久化并发数
     concurrencyEl.addEventListener('blur', function() {
       dbSet('tllmh_concurrency', concurrencyEl.value);
