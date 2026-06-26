@@ -1782,7 +1782,10 @@ function tagAdminPoolEdit(e, el) {
 function tagAdminDeletePoolItem(e, el) {
   e.stopPropagation();
   var chip = el.closest('.tag-admin-pool-chip');
-  var name = chip.querySelector('.tag-admin-pool-text').textContent;
+  if (!chip) return;
+  var nameEl = chip.querySelector('.tag-admin-pool-text');
+  if (!nameEl) return;
+  var name = nameEl.textContent;
   var pool = getSubPool(); var idx = pool.indexOf(name); if (idx !== -1) { pool.splice(idx, 1); saveSubPool(pool); }
   chip.remove();
   if (document.querySelectorAll('.tag-admin-pool-chip').length === 0) _refreshPool();
