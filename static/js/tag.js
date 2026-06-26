@@ -1962,14 +1962,6 @@ function tagAdminImport() {
 }
 
 // ── 初始化(由 switchPage 懒调用,只执行一次) ──
-
-// ── 文件导入 ──
-function handleTagFiles(e) {
-  if (e && e.target !== e.currentTarget) return;
-  document.getElementById('tagFileInput').click();
-}
-
-
 function tagInit() {
   // 绑定拖拽上传
   var dz = document.getElementById('tagDropZone');
@@ -2065,7 +2057,6 @@ window.tagAdminPoolDrop = tagAdminPoolDrop;
 
 window._autoSave = _autoSave;
 
-window.handleTagFiles = handleTagFiles;
 
 window.tagExportDialog = tagExportDialog;
 window.tagExportDo = tagExportDo;
@@ -2090,5 +2081,4 @@ export {
   tagSendToTranslate, tagStart, tagStop, tagToggleCatPanel, tagToggleCollapse,
   tagToggleStrategy, tagTriggerDownload, tagUpdateCounts, tagUpdateOneCard,
   tagUpdateTagStartButton, resetTagStrategy,
-  _autoSave, handleTagFiles
 };
