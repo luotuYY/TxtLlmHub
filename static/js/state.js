@@ -147,7 +147,7 @@ function loadModeParams(mode) {
   var promptToggle = $('promptToggle');
   if (promptToggle) {
     if (mode === 'polish') {
-      promptToggle.textContent = promptToggle.textContent.indexOf('▲') >= 0 ? '提示词 ▲' : '提示词 ▼';
+      promptToggle.textContent = promptToggle.textContent.indexOf('▲') >= 0 ? '底稿提示词 ▲' : '底稿提示词 ▼';
       promptToggle.title = '展开/折叠提示词（底稿 + 润色策略）';
     } else {
       promptToggle.textContent = promptToggle.textContent.indexOf('▲') >= 0 ? '翻译提示词 ▲' : '翻译提示词 ▼';
