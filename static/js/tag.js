@@ -345,21 +345,39 @@ function tagRenderColumns() {
   if (untagged.length === 0 && tagState.lines.length > 0) html += '<div class="tag-column-empty">所有词条已分类 ✓</div>';
   html += '</div></div>';
   container.innerHTML = html;
-  // Remove old pagination bar
-  var parent = container.parentElement;
-  var oldPg = parent.querySelector('.pagination-bar');
-  if (oldPg) oldPg.remove();
-  // 分页控件：按最长列的条目数计算总页数
-  if (maxColItems > perPage) {
-    container.insertAdjacentHTML('afterend', _renderPagination(maxColItems, perPage, colPage, 'tag-columns'));
-    _bindPagination(parent.id, 'tag-columns', {
-      onPage: function(p) { tagState.columnsPage = p; tagRenderColumns(); },
-      onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.columnsPage = 1; tagRenderPreview(); tagRenderColumns(); }
-    });
-  }
+  // 分页控件
+  _ensureTagPagination(container);
   // 如果分类标签面板处于展开状态,同步刷新
   var catPanel = document.getElementById('tagCatPanel');
   if (catPanel && catPanel.classList.contains('visible')) tagRenderCatPanel();
+}
+
+// ── 确保分页条存在（流式过程中按需创建，已存在则跳过） ──
+function _ensureTagPagination(container) {
+  if (!container) container = document.getElementById('tagColumns');
+  if (!container) return;
+  var parent = container.parentElement;
+  if (!parent) return;
+  // 已存在则不重复创建（tagRenderColumns 全量渲染时会处理更新）
+  if (parent.querySelector('.pagination-bar')) return;
+  var perPage = tagState.previewRowLimit || 200;
+  var schema = getEnabledSchema();
+  var maxColItems = 0;
+  Object.keys(schema).forEach(function(l1) {
+    var cnt = tagState.lines.filter(function(l) { return l.tag_l1 === l1; }).length;
+    if (cnt > maxColItems) maxColItems = cnt;
+  });
+  var untaggedCnt = tagState.lines.filter(function(l) { return !l.tag_l1; }).length;
+  if (untaggedCnt > maxColItems) maxColItems = untaggedCnt;
+  if (maxColItems <= perPage) return;
+  var maxTotalPages = Math.max(1, Math.ceil(maxColItems / perPage));
+  var colPage = tagState.columnsPage || 1;
+  if (colPage > maxTotalPages) { colPage = maxTotalPages; tagState.columnsPage = colPage; }
+  container.insertAdjacentHTML('afterend', _renderPagination(maxColItems, perPage, colPage, 'tag-columns'));
+  _bindPagination(parent.id, 'tag-columns', {
+    onPage: function(p) { tagState.columnsPage = p; tagRenderColumns(); },
+    onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.columnsPage = 1; tagRenderPreview(); tagRenderColumns(); }
+  });
 }
 
 // ── 增量更新单张卡片(分词进行时不重建整个列) ──
@@ -436,8 +454,9 @@ function tagUpdateOneCard(line) {
       if (newCard2) newCard2.setAttribute('data-l1', expectedL1);
     }
   }
-  // 实时更新列头计数
+  // 实时更新列头计数 + 流式过程中按需创建分页条
   tagUpdateCounts();
+  _ensureTagPagination();
 }
 
 // ── 列头计数更新 ──
