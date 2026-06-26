@@ -1,13 +1,12 @@
 /**
- * TxtLlmHub — 去重模块
+ * LinguaForge — 去重模块
  */
 
 import { $, escHtml, showToast } from './utils.js';
 import { state, getApiConfig } from './state.js';
-(function () {
-  "use strict";
+import { dbGet, dbSet } from './db.js';
 
-  var dedupState = {
+var dedupState = {
     entries: [],
     groups: {},
     files: [],
@@ -19,10 +18,10 @@ import { state, getApiConfig } from './state.js';
     evaluating: false,
     abort: false,
     fileContents: {},
-  };
+};
 
-  // ── 默认参数 ──
-  var DEDUP_DEFAULTS = {
+// ── 默认参数 ──
+var DEDUP_DEFAULTS = {
     temperature: 0.1,
     top_p: 0.6,
     max_tokens: 10,
@@ -32,25 +31,25 @@ import { state, getApiConfig } from './state.js';
       "你是一个专业的文本质量评估专家。\n" +
       "以下是一组具有相同原文但不同译文的条目，请判断哪一条译文质量最高。\n" +
       "评估标准：准确性（是否忠实于原文）、自然度（是否通顺地道）、语境适配（是否符合游戏场景）。",
-  };
+};
 
-  // ── 持久化 ──
-  function loadDedupParams() {
+// ── 持久化 ──
+function loadDedupParams() {
     var cfg = {};
-    try { cfg = JSON.parse(localStorage.getItem("tllmh_dedup_params") || "{}"); } catch (e) { cfg = {}; }
+    cfg = dbGet("tllmh_dedup_params", {});
     $("dedupTemperature").value = cfg.temperature != null ? cfg.temperature : DEDUP_DEFAULTS.temperature;
     $("dedupTopP").value = cfg.top_p != null ? cfg.top_p : DEDUP_DEFAULTS.top_p;
     $("dedupMaxTokens").value = cfg.max_tokens != null ? cfg.max_tokens : DEDUP_DEFAULTS.max_tokens;
     $("dedupRepPenalty").value = cfg.rep_penalty != null ? cfg.rep_penalty : DEDUP_DEFAULTS.rep_penalty;
     $("dedupConcurrency").value = cfg.concurrency != null ? cfg.concurrency : DEDUP_DEFAULTS.concurrency;
     $("dedupStrategyText").value = cfg.strategy || DEDUP_DEFAULTS.strategy;
-  }
+}
 
-  window.saveDedupParams = function () {
-    localStorage.setItem("tllmh_dedup_params", JSON.stringify(getDedupParams()));
-  };
+window.saveDedupParams = function () {
+    dbSet("tllmh_dedup_params", getDedupParams());
+};
 
-  function getDedupParams() {
+function getDedupParams() {
     return {
       temperature: parseFloat($("dedupTemperature").value) || DEDUP_DEFAULTS.temperature,
       top_p: parseFloat($("dedupTopP").value) || DEDUP_DEFAULTS.top_p,
@@ -59,25 +58,25 @@ import { state, getApiConfig } from './state.js';
       concurrency: parseInt($("dedupConcurrency").value) || DEDUP_DEFAULTS.concurrency,
       strategy: $("dedupStrategyText").value.trim() || DEDUP_DEFAULTS.strategy,
     };
-  }
+}
 
-  window.toggleDedupStrategy = function () {
+window.toggleDedupStrategy = function () {
     var row = $("dedupStrategyRow");
     var toggle = $("dedupStrategyToggle");
     if (!row || !toggle) return;
     var show = row.style.display === "none" || !row.style.display;
     row.style.display = show ? "flex" : "none";
     toggle.textContent = show ? "评估策略 ▲" : "评估策略 ▼";
-  };
+};
 
-  window.resetDedupStrategy = function () {
+window.resetDedupStrategy = function () {
     $("dedupStrategyText").value = DEDUP_DEFAULTS.strategy;
     saveDedupParams();
     dedupLog("已恢复默认评估策略");
-  };
+};
 
-  // ── 日志 ──
-  function dedupLog(msg, cls) {
+// ── 日志 ──
+function dedupLog(msg, cls) {
     var area = $("dedupLogArea");
     if (!area) return;
     area.style.display = "flex";
@@ -88,28 +87,28 @@ import { state, getApiConfig } from './state.js';
     area.innerHTML +=
       '<div class="log-line"><span class="log-time">' + time + "</span> " + body + "</div>";
     area.scrollTop = area.scrollHeight;
-  }
+}
 
-  function clearDedupLog() {
+function clearDedupLog() {
     var area = $("dedupLogArea");
     if (area) {
       area.innerHTML = "";
       area.style.display = "none";
     }
-  }
+}
 
-  // ── 条目工具 ──
-  function _entryId(e) {
+// ── 条目工具 ──
+function _entryId(e) {
     return (e.file || "") + "|" + (e.line != null ? e.line : 0);
-  }
+}
 
-  function getDedupApiConfig() {
+function getDedupApiConfig() {
     if (typeof window.getApiConfig === "function") return window.getApiConfig();
     return { provider: "local" };
-  }
+}
 
-  // ── 增量更新整组 DOM（以组为单位） ──
-  function _updateGroupDOM(key, gIdx) {
+// ── 增量更新整组 DOM（以组为单位） ──
+function _updateGroupDOM(key, gIdx) {
     var container = $("dedupGroups");
     if (!container) return;
     var group = dedupState.groups[key];
@@ -145,10 +144,10 @@ import { state, getApiConfig } from './state.js';
         if (isBest) row.classList.add("dedup-row-best");
       }
     });
-  }
+}
 
-  // ── 全量渲染重复组 ──
-  function renderGroups() {
+// ── 全量渲染重复组 ──
+function renderGroups() {
     var container = $("dedupGroups");
     if (!container) return;
 
@@ -222,10 +221,10 @@ import { state, getApiConfig } from './state.js';
 
     $("dedupApplyBtn").disabled = false;
     updateSelectedCount();
-  }
+}
 
-  // 供 onclick 调用
-  window._dedupSelect = function (gIdx, idx) {
+// 供 onclick 调用
+window._dedupSelect = function (gIdx, idx) {
     var key = dedupState.visibleKeys[gIdx];
     if (key == null) return;
     var group = dedupState.groups[key];
@@ -238,9 +237,9 @@ import { state, getApiConfig } from './state.js';
     // 以组为单位增量渲染
     _updateGroupDOM(key, gIdx);
     updateSelectedCount();
-  };
+};
 
-  window.toggleDedupGroup = function (el) {
+window.toggleDedupGroup = function (el) {
     var body = el.nextElementSibling;
     var toggle = el.querySelector(".dedup-group-toggle");
     if (body.style.display === "none") {
@@ -250,26 +249,26 @@ import { state, getApiConfig } from './state.js';
       body.style.display = "none";
       toggle.textContent = "▶";
     }
-  };
+};
 
-  function updateSelectedCount() {
+function updateSelectedCount() {
     var count = 0;
     dedupState.selected.forEach(function (v) { if (v) count++; });
     $("dedupSelectedCount").textContent = count;
-  }
+}
 
-  // ── 文件读取 ──
-  function readFileAsText(file) {
+// ── 文件读取 ──
+function readFileAsText(file) {
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
       reader.onload = function (e) { resolve(e.target.result); };
       reader.onerror = reject;
       reader.readAsText(file, "UTF-8");
     });
-  }
+}
 
-  // ── 上传（仅解析，不评估） ──
-  async function handleFiles(fileList) {
+// ── 上传（仅解析，不评估） ──
+async function handleFiles(fileList) {
     if (dedupState.processing) return;
     dedupState.processing = true;
     $("dedupBtnStart").disabled = true;
@@ -366,18 +365,18 @@ import { state, getApiConfig } from './state.js';
     } finally {
       dedupState.processing = false;
     }
-  }
+}
 
-  // ── 批量评估（分块发送，每块完后检查 abort） ──
-  function _chunkArray(arr, size) {
+// ── 批量评估（分块发送，每块完后检查 abort） ──
+function _chunkArray(arr, size) {
     var chunks = [];
     for (var i = 0; i < arr.length; i += size) {
       chunks.push(arr.slice(i, i + size));
     }
     return chunks;
-  }
+}
 
-  async function _evaluateOneChunk(groupsChunk, chunkIdx) {
+async function _evaluateOneChunk(groupsChunk, chunkIdx) {
     var params = getDedupParams();
     var apiConfig = getDedupApiConfig();
 
@@ -395,9 +394,9 @@ import { state, getApiConfig } from './state.js';
         ...apiConfig,
       }),
     });
-  }
+}
 
-  async function _streamOneChunk(groupsChunk, chunkIdx, chunkKeys, total, completed, errors, offset) {
+async function _streamOneChunk(groupsChunk, chunkIdx, chunkKeys, total, completed, errors, offset) {
     var r = await _evaluateOneChunk(groupsChunk, chunkIdx);
     if (!r.ok) {
       var errData = await r.json().catch(function () { return { error: "HTTP " + r.status }; });
@@ -453,9 +452,9 @@ import { state, getApiConfig } from './state.js';
         } catch (e) {}
       }
     }
-  }
+}
 
-  window.dedupStart = async function () {
+window.dedupStart = async function () {
     if (dedupState.evaluating) return;
     var groupKeys = Object.keys(dedupState.groups);
     if (groupKeys.length === 0) { showToast("无重复组"); return; }
@@ -544,9 +543,9 @@ import { state, getApiConfig } from './state.js';
       $("dedupBtnStart").disabled = false;
       $("dedupBtnStop").disabled = true;
     }
-  };
+};
 
-  window.dedupStop = function () {
+window.dedupStop = function () {
     dedupState.abort = true;
     $("dedupBtnStop").disabled = true;
     $("dedupBtnStop").textContent = "停止中...";
@@ -554,18 +553,18 @@ import { state, getApiConfig } from './state.js';
     setTimeout(function () {
       if ($("dedupBtnStop")) $("dedupBtnStop").textContent = "停止";
     }, 1000);
-  };
+};
 
 
-  // ── 筛选/导航 ──
-  window._dedupToggleFilter = function () {
+// ── 筛选/导航 ──
+window._dedupToggleFilter = function () {
     dedupState.filterDupOnly = !dedupState.filterDupOnly;
     dedupState.visibleKeys = [];
     renderGroups();
-  };
+};
 
-  // ── 应用去重（下载 zip） ──
-  window.applyDedup = async function () {
+// ── 应用去重（下载 zip） ──
+window.applyDedup = async function () {
     if (dedupState.processing) return;
 
     // 直接从 groups + selected 构建 selected 条目列表，不依赖 entries.find
@@ -625,11 +624,11 @@ import { state, getApiConfig } from './state.js';
     } finally {
       dedupState.processing = false;
     }
-  };
+};
 
-  // ── 事件绑定 ──
-  // 递归遍历拖拽的目录结构（dataTransfer.files 不递归子目录）
-  async function _traverseEntry(entry, path, results) {
+// ── 事件绑定 ──
+// 递归遍历拖拽的目录结构（dataTransfer.files 不递归子目录）
+async function _traverseEntry(entry, path, results) {
     if (entry.isFile) {
       return new Promise(function (resolve, reject) {
         entry.file(function (file) {
@@ -664,9 +663,9 @@ import { state, getApiConfig } from './state.js';
         }));
       });
     }
-  }
+}
 
-  async function _getFilesFromDataTransferItems(items) {
+async function _getFilesFromDataTransferItems(items) {
     var results = [];
     var pending = [];
     for (var i = 0; i < items.length; i++) {
@@ -683,9 +682,9 @@ import { state, getApiConfig } from './state.js';
     }
     await Promise.all(pending);
     return results;
-  }
+}
 
-  function setupUpload() {
+function setupUpload() {
     var dropZone = $("dedupDropZone");
     var fileInput = $("dedupFileInput");
     if (!dropZone || !fileInput) return;
@@ -772,23 +771,27 @@ import { state, getApiConfig } from './state.js';
       }
       return result;
     }
-  }
+}
 
-  function setupParams() {
+function setupParams() {
     loadDedupParams();
-  }
+}
 
-  function init() {
+function init() {
     setupUpload();
     setupParams();
     // 日志区准备就绪（初始隐藏）
     var la = $("dedupLogArea");
     if (la) la.style.display = "none";
     renderGroups();
-  }
+}
 
-  window.dedupInit = init;
-})();
+window.dedupInit = init;
 
-// ── Module exports (window bindings set inside IIFE above) ──
-export {};
+
+// ── Module exports ──
+export {
+  dedupInit, dedupStart, dedupStop, applyDedup,
+  saveDedupParams, toggleDedupStrategy, resetDedupStrategy,
+  toggleDedupGroup, _dedupSelect, _dedupToggleFilter
+};

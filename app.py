@@ -1,4 +1,4 @@
-"""TxtLlmHub — Flask 后端
+"""LinguaForge — Flask 后端
 文件上传解析、LLM API 调用、批量流式翻译/润色/分词
 """
 import os
@@ -1036,6 +1036,6 @@ atexit.register(_close_session)
 
 if __name__ == "__main__":
     os.makedirs("static", exist_ok=True)
-    print(f"TxtLlmHub 启动: http://127.0.0.1:5000")
+    print(f"LinguaForge 启动: http://127.0.0.1:5000")
     print(f"LLM API: {LLM_API_URL}")
     app.run(host="127.0.0.1", port=5000, debug=False)

@@ -1,5 +1,5 @@
 ﻿/**
- * TxtLlmHub — 渲染层
+ * LinguaForge — 渲染层
  * 预览列表、对比表格的 DOM 渲染，搜索 UI，复选框/排序状态管理
  * Depends on: utils.js, state.js
  */

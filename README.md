@@ -1,4 +1,4 @@
-# TxtLlmHub
+# LinguaForge
 
 本地 LLM + 商业 API 双模文本工具，支持 **翻译/润色** 和 **分词/标签分类** 两大功能。上传 `原文=旧译文` 格式的 txt 文件，逐行处理，预览、对比、导出一站完成。
 
@@ -15,7 +15,7 @@
 ## 项目结构
 
 ```
-TxtLlmHub/
+LinguaForge/
 ├── app.py                  # Flask 后端（API 路由 + LLM 调用）
 ├── requirements.txt        # Python 依赖：flask + requests
 ├── start.bat               # Windows 一键启动
@@ -25,12 +25,14 @@ TxtLlmHub/
 │   ├── css/
 │   │   └── style.css       # 全局样式（含分词页）
 │   └── js/
+│       ├── db.js           # IndexedDB 持久化层（内存缓存 + 自动迁移 localStorage）
 │       ├── utils.js        # 工具函数（DOM、高亮、toast）
 │       ├── state.js        # 状态管理 + 提示词模板 + LLM 配置
 │       ├── api.js          # API 调用 + 文件管理 + 批量翻译
 │       ├── render.js       # DOM 渲染（预览 + 对比表）
 │       ├── app.js          # 事件处理 + 网格拖拽 + 导出
 │       ├── tag.js          # 分词页完整逻辑（独立模块）
+│       ├── dedup.js        # 去重页完整逻辑
 │       └── particles.js    # 粒子特效
 └── README.md
 ```

@@ -1,8 +1,8 @@
 @echo off
-title TxtLlmHub
+title LinguaForge
 
 echo =============================================
-echo   TxtLlmHub - Local LLM Translation Tool
+echo   LinguaForge - Local LLM Translation Tool
 echo =============================================
 echo.
 
@@ -44,7 +44,7 @@ if %errorlevel% neq 0 (
 echo.
 echo [2/3] Make sure LLM server is running at 127.0.0.1:8080
 echo.
-echo [3/3] Starting TxtLlmHub...
+echo [3/3] Starting LinguaForge...
 echo.
 echo =============================================
 echo   Server: http://127.0.0.1:5000

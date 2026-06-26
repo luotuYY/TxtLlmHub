@@ -1,5 +1,5 @@
 ﻿/**
- * TxtLlmHub — 事件处理与流程编排
+ * LinguaForge — 事件处理与流程编排
  * SPA 页面切换、搜索、翻译控制、导出、网格拖拽、行内编辑
  * Depends on: utils.js, state.js, api.js, render.js
  */

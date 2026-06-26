@@ -1,8 +1,15 @@
 ﻿/**
- * TxtLlmHub - 分词/标签模块
+ * LinguaForge - 分词/标签模块
  * 文本分类、LLM 分词、卡片拖拽排序、标签管理、导入翻译
- * Depends on: utils.js($, escHtml, showToast, log)
+ * Depends on: utils.js, db.js, state.js, api.js, render.js, app.js
  */
+
+import { $, escHtml, showToast, log, logChunk, setHighlight, hl, matches } from './utils.js';
+import { dbGet, dbSet, dbHas } from './db.js';
+import { state, rebuildIndicesAndCheckboxes, updateTranslateAllButton } from './state.js';
+import { renderFileList } from './api.js';
+import { renderPreview, renderCompare } from './render.js';
+import { switchPage } from './app.js';
 
 // ── 分词页状态 ──
 var tagState = {
@@ -32,15 +39,10 @@ var DEFAULT_TAG_SCHEMA = {
 };
 
 function getTagSchema() {
-  try {
-    var saved = localStorage.getItem('tllmh_tag_schema');
-    if (saved) {
-      var parsed = JSON.parse(saved);
-      if (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) { /* ignore corrupt data */ }
+  var saved = dbGet('tllmh_tag_schema');
+  if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) {
+    return saved;
+  }
   return DEFAULT_TAG_SCHEMA;
 }
 
@@ -54,21 +56,16 @@ function getEnabledSchema() {
 }
 
 function saveTagSchema(schema) {
-  localStorage.setItem('tllmh_tag_schema', JSON.stringify(schema));
+  dbSet('tllmh_tag_schema', schema);
 }
 
 function getSubPool() {
-  try {
-    var saved = localStorage.getItem('tllmh_sub_pool');
-    if (saved) {
-      var arr = JSON.parse(saved);
-      if (Array.isArray(arr)) return arr;
-    }
-  } catch (e) { /* ignore */ }
+  var saved = dbGet('tllmh_sub_pool');
+  if (Array.isArray(saved)) return saved;
   return DEFAULT_SUB_POOL.slice();
 }
 function saveSubPool(pool) {
-  localStorage.setItem('tllmh_sub_pool', JSON.stringify(pool));
+  dbSet('tllmh_sub_pool', pool);
 }
 
 function getAllSubCategories() {
@@ -1466,20 +1463,20 @@ function tagLoadStrategyPreset(index) {
   if (!p) return;
   var ta = document.getElementById('tagStrategyText');
   if (ta) ta.value = p.text;
-  localStorage.setItem('tllmh_tag_strategy', p.text);
+  dbSet('tllmh_tag_strategy', p.text);
   showToast('已加载: ' + p.name);
 }
 
 function saveTagStrategy() {
   var ta = document.getElementById('tagStrategyText');
-  if (ta) localStorage.setItem('tllmh_tag_strategy', ta.value);
+  if (ta) dbSet('tllmh_tag_strategy', ta.value);
 }
 
 function resetTagStrategy() {
   var ta = document.getElementById('tagStrategyText');
   if (ta) {
     ta.value = _tagStrategyPresets[0].text;
-    localStorage.setItem('tllmh_tag_strategy', ta.value);
+    dbSet('tllmh_tag_strategy', ta.value);
   }
   showToast('已恢复默认分类策略');
 }
@@ -1487,14 +1484,14 @@ function resetTagStrategy() {
 function _initTagStrategy() {
   var ta = document.getElementById('tagStrategyText');
   if (!ta) return;
-  var saved = localStorage.getItem('tllmh_tag_strategy');
+  var saved = dbGet('tllmh_tag_strategy');
   if (saved !== null) {
     ta.value = saved;
   } else {
     // 从后端加载默认值
     try {
       fetch('/api/config').then(function(r) { return r.json(); }).then(function(d) {
-        if (d.default_tag_strategy && !localStorage.getItem('tllmh_tag_strategy')) {
+        if (d.default_tag_strategy && !dbHas('tllmh_tag_strategy')) {
           ta.value = d.default_tag_strategy;
         }
       });
@@ -2076,4 +2073,22 @@ window.tagExportDo = tagExportDo;
 window.tagImportDialog = tagImportDialog;
 window.tagImportDo = tagImportDo;
 
-export {};
+// ── Module exports ──
+export {
+  tagAdminAddGroup, tagAdminAddSub, tagAdminAddToPool, tagAdminDeletePoolItem,
+  tagAdminDragLeave, tagAdminDragOver, tagAdminDrop, tagAdminExport, tagAdminImport,
+  tagAdminPoolDragEnd, tagAdminPoolDragStart, tagAdminPoolDrop, tagAdminPoolEdit,
+  tagAdminRemoveGroup, tagAdminRemoveSub, tagAdminSubDragStart, tagAdminSubDragEnd,
+  tagBtnState, tagCardDragEnd, tagCardDragStart, tagClearAll, tagClearSearch,
+  tagDeleteFile, tagDragLeave, tagDragOver, tagDrop, tagEditCategory,
+  tagEditFilter, tagEditPick, tagEditSelectChange, tagExport, tagExportDialog,
+  tagExportDo, tagExportSeparate, tagGetApiConfig, tagImportDialog, tagImportDo,
+  tagInit, tagLoadManualInput, tagLoadStrategyPreset, tagLog, tagLogClear,
+  tagOnCustomLimitChange, tagOnRowLimitChange, tagOnSearch, tagOpenAdmin,
+  tagProcessFiles, tagRenderCard, tagRenderCatPanel, tagRenderColumns,
+  tagRenderFileList, tagRenderPreview, tagRenderStrategyPresets,
+  tagSendToTranslate, tagStart, tagStop, tagToggleCatPanel, tagToggleCollapse,
+  tagToggleStrategy, tagTriggerDownload, tagUpdateCounts, tagUpdateOneCard,
+  tagUpdateTagStartButton, resetTagStrategy,
+  _autoSave, handleTagFiles
+};

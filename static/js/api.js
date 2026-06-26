@@ -1,5 +1,5 @@
 ﻿/**
- * TxtLlmHub — API 层
+ * LinguaForge — API 层
  * 文件上传解析、手动输入、LLM 翻译调用、批量流式翻译、文件管理
  * Depends on: utils.js, state.js, render.js
  */
