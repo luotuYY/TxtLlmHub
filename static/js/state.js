@@ -113,6 +113,14 @@ function resetParamDefault(el) {
   if (_modeReady) saveModeParams(state.translateMode);
 }
 
+// ── 去重页参数双击重置 ──
+function resetDedupParamDefault(el) {
+  var defaults = { dedupTemperature: '0.1', dedupTopP: '0.6', dedupMaxTokens: '10', dedupRepPenalty: '1.0' };
+  if (defaults[el.id]) el.value = defaults[el.id];
+  if (window.getSelection) window.getSelection().removeAllRanges();
+  el.blur();
+}
+
 function saveModeParams(mode) {
   var p = {
     temperature: $('temperature').value,
@@ -729,4 +737,4 @@ document.addEventListener('visibilitychange', function () {
 });
 
 // ── Module exports ──
-export { state, rebuildIndicesAndCheckboxes, PRESET_PROMPTS, DIRECT_DEFAULT, POLISH_DIRECT_DEFAULT, POLISH_STEP2_DEFAULT, getPolishStep2Prompt, setPolishStep2Prompt, resetParamDefault, saveModeParams, loadModeParams, getLLMParams, setMode, updateTranslateAllButton, getApiConfig, loadApiConfig, saveApiConfig, testApiConnection, setProvider, onThinkingChange, checkLLM, loadDefaults, savePolishStrategy, showPromptBar, onTitleFocus, savePrompt, loadSavedPrompt, deletePrompt, renderSavedPrompts, togglePrompt, resetSystemPrompt, exportPrompts, importPrompts, updateManualBtn, updateRetryButton, updateExportCheckedButton, promptKey };
+export { state, rebuildIndicesAndCheckboxes, PRESET_PROMPTS, DIRECT_DEFAULT, POLISH_DIRECT_DEFAULT, POLISH_STEP2_DEFAULT, getPolishStep2Prompt, setPolishStep2Prompt, resetParamDefault, resetDedupParamDefault, saveModeParams, loadModeParams, getLLMParams, setMode, updateTranslateAllButton, getApiConfig, loadApiConfig, saveApiConfig, testApiConnection, setProvider, onThinkingChange, checkLLM, loadDefaults, savePolishStrategy, showPromptBar, onTitleFocus, savePrompt, loadSavedPrompt, deletePrompt, renderSavedPrompts, togglePrompt, resetSystemPrompt, exportPrompts, importPrompts, updateManualBtn, updateRetryButton, updateExportCheckedButton, promptKey };

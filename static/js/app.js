@@ -761,10 +761,13 @@ function triggerDownload(filename, fcontent) {
   _bind('previewRowLimit', 'change', onPreviewRowLimitChange);
   _bind('previewCustomLimit', 'change', onPreviewCustomLimitChange);
 
-  // ── 翻译页：双击恢复默认参数 ──
-  document.querySelectorAll('.param-row label + input[type="number"]').forEach(function(input) {
-    input.addEventListener('dblclick', function() { resetParamDefault(input); });
-  });
+  // ── 翻译页：双击恢复默认参数（仅翻译页的 .param-row） ──
+  var translateParamRow = document.querySelector('#page-translate .param-row');
+  if (translateParamRow) {
+    translateParamRow.querySelectorAll('label + input[type="number"]').forEach(function(input) {
+      input.addEventListener('dblclick', function() { resetParamDefault(input); });
+    });
+  }
 
   // ── 翻译页：提示词管理 ──
   _bind('promptTitle', 'focus', onTitleFocus);

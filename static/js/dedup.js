@@ -4,7 +4,7 @@
 
 import { $, escHtml, showToast } from './utils.js';
 import { _renderPagination } from './render.js';
-import { state, getApiConfig } from './state.js';
+import { state, getApiConfig, resetDedupParamDefault } from './state.js';
 import { dbGet, dbSet } from './db.js';
 
 var dedupState = {
@@ -889,6 +889,14 @@ function init() {
     _bindChange("dedupMaxTokens", saveDedupParams);
     _bindChange("dedupRepPenalty", saveDedupParams);
     _bindChange("dedupConcurrency", saveDedupParams);
+
+    // 双击恢复默认值
+    var dedupParamRow = document.querySelector('#page-dedup .param-row');
+    if (dedupParamRow) {
+      dedupParamRow.querySelectorAll('label + input[type="number"]').forEach(function(input) {
+        input.addEventListener('dblclick', function() { resetDedupParamDefault(input); saveDedupParams(); });
+      });
+    }
 }
 
 
