@@ -45,9 +45,9 @@ function loadDedupParams() {
     $("dedupStrategyText").value = cfg.strategy || DEDUP_DEFAULTS.strategy;
 }
 
-window.saveDedupParams = function () {
+function saveDedupParams() {
     dbSet("tllmh_dedup_params", getDedupParams());
-};
+}
 
 function getDedupParams() {
     return {
@@ -60,20 +60,20 @@ function getDedupParams() {
     };
 }
 
-window.toggleDedupStrategy = function () {
+function toggleDedupStrategy() {
     var row = $("dedupStrategyRow");
     var toggle = $("dedupStrategyToggle");
     if (!row || !toggle) return;
     var show = row.style.display === "none" || !row.style.display;
     row.style.display = show ? "flex" : "none";
     toggle.textContent = show ? "评估策略 ▲" : "评估策略 ▼";
-};
+}
 
-window.resetDedupStrategy = function () {
+function resetDedupStrategy() {
     $("dedupStrategyText").value = DEDUP_DEFAULTS.strategy;
     saveDedupParams();
     dedupLog("已恢复默认评估策略");
-};
+}
 
 // ── 日志 ──
 function dedupLog(msg, cls) {
@@ -224,7 +224,7 @@ function renderGroups() {
 }
 
 // 供 onclick 调用
-window._dedupSelect = function (gIdx, idx) {
+function _dedupSelect(gIdx, idx) {
     var key = dedupState.visibleKeys[gIdx];
     if (key == null) return;
     var group = dedupState.groups[key];
@@ -237,9 +237,10 @@ window._dedupSelect = function (gIdx, idx) {
     // 以组为单位增量渲染
     _updateGroupDOM(key, gIdx);
     updateSelectedCount();
-};
+}
+window._dedupSelect = _dedupSelect;
 
-window.toggleDedupGroup = function (el) {
+function toggleDedupGroup(el) {
     var body = el.nextElementSibling;
     var toggle = el.querySelector(".dedup-group-toggle");
     if (body.style.display === "none") {
@@ -249,7 +250,8 @@ window.toggleDedupGroup = function (el) {
       body.style.display = "none";
       toggle.textContent = "▶";
     }
-};
+}
+window.toggleDedupGroup = toggleDedupGroup;
 
 function updateSelectedCount() {
     var count = 0;
@@ -454,7 +456,7 @@ async function _streamOneChunk(groupsChunk, chunkIdx, chunkKeys, total, complete
     }
 }
 
-window.dedupStart = async function () {
+async function dedupStart() {
     if (dedupState.evaluating) return;
     var groupKeys = Object.keys(dedupState.groups);
     if (groupKeys.length === 0) { showToast("无重复组"); return; }
@@ -545,7 +547,7 @@ window.dedupStart = async function () {
     }
 };
 
-window.dedupStop = function () {
+function dedupStop() {
     dedupState.abort = true;
     $("dedupBtnStop").disabled = true;
     $("dedupBtnStop").textContent = "停止中...";
@@ -557,14 +559,14 @@ window.dedupStop = function () {
 
 
 // ── 筛选/导航 ──
-window._dedupToggleFilter = function () {
+function _dedupToggleFilter() {
     dedupState.filterDupOnly = !dedupState.filterDupOnly;
     dedupState.visibleKeys = [];
     renderGroups();
 };
 
 // ── 应用去重（下载 zip） ──
-window.applyDedup = async function () {
+async function applyDedup() {
     if (dedupState.processing) return;
 
     // 直接从 groups + selected 构建 selected 条目列表，不依赖 entries.find
@@ -787,6 +789,14 @@ function init() {
 }
 
 window.dedupInit = init;
+var dedupInit = init;
+window.dedupStart = dedupStart;
+window.dedupStop = dedupStop;
+window.applyDedup = applyDedup;
+window.saveDedupParams = saveDedupParams;
+window.toggleDedupStrategy = toggleDedupStrategy;
+window.resetDedupStrategy = resetDedupStrategy;
+window._dedupToggleFilter = _dedupToggleFilter;
 
 
 // ── Module exports ──
