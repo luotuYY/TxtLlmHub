@@ -552,9 +552,11 @@ def _stream_batch_response(valid_items, empty_indices, concurrency, submit_fn, r
                                     s = content_text.index("{")
                                     e = content_text.rindex("}")
                                     j = json.loads(content_text[s:e+1])
-                                    tag_l1 = j.get("l1", "")
-                                    tag_l2 = j.get("l2", "")
-                                    confidence = j.get("confidence", 0)
+                                    # Normalize keys: try common variations
+                                    jn = {k.lower().strip(): v for k, v in j.items()}
+                                    tag_l1 = jn.get("l1", jn.get("level1", jn.get("category", jn.get("tag", ""))))
+                                    tag_l2 = jn.get("l2", jn.get("level2", jn.get("subcategory", jn.get("sub", ""))))
+                                    confidence = jn.get("confidence", jn.get("conf", jn.get("score", 0)))
                                 except (ValueError, json.JSONDecodeError, KeyError):
                                     pass
                             result_queue.put((idx, tag_l1, tag_l2, confidence, result.get("error", "")))

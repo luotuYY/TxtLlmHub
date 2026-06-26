@@ -335,16 +335,14 @@ function tagRenderColumns() {
   html += '</div></div>';
   container.innerHTML = html;
   // Remove old pagination bar
-  var oldPg = container.parentElement.querySelector('.pagination-bar');
+  var parent = container.parentElement;
+  var oldPg = parent.querySelector('.pagination-bar');
   if (oldPg) oldPg.remove();
-  // 分页控件
+  // 分页控件（插入到 columns 容器之后、card-body 内）
   var totalItems = tagState.lines.length;
   if (totalItems > perPage) {
-    var pgHtml = _renderPagination(totalItems, perPage, colPage, 'tag-columns');
-    var pgDiv = document.createElement('div');
-    pgDiv.innerHTML = pgHtml;
-    container.parentElement.appendChild(pgDiv.firstChild);
-    _bindPagination(container.parentElement.id || 'tagColumns', 'tag-columns', {
+    container.insertAdjacentHTML('afterend', _renderPagination(totalItems, perPage, colPage, 'tag-columns'));
+    _bindPagination(parent.id, 'tag-columns', {
       onPage: function(p) { tagState.columnsPage = p; tagRenderColumns(); },
       onRowsPerPage: function(v) { tagState.previewRowLimit = v; tagState.previewPage = 1; tagState.columnsPage = 1; tagRenderPreview(); tagRenderColumns(); }
     });
@@ -1055,11 +1053,24 @@ async function tagStart() {
                   errors++;
                   tagLog('[' + (done+1) + '] ✗ "' + item.original.substring(0,20) + '" → ' + res.error, 'err');
                 } else if (!item._manualEdit) {
-                  item.tag_l1 = res.tag_l1;
-                  item.tag_l2 = res.tag_l2;
+                  // Normalize tag_l1: match against schema (case-insensitive, trim)
+                  var l1 = (res.tag_l1 || '').trim();
+                  var l2 = (res.tag_l2 || '').trim();
+                  if (l1) {
+                    var schemaKeys = Object.keys(getEnabledSchema());
+                    var matchL1 = schemaKeys.find(function(k) { return k.toLowerCase() === l1.toLowerCase(); });
+                    if (matchL1) l1 = matchL1;
+                    else {
+                      // Fuzzy: check if l1 contains or is contained by a schema key
+                      var fuzzy = schemaKeys.find(function(k) { return k.toLowerCase().indexOf(l1.toLowerCase()) >= 0 || l1.toLowerCase().indexOf(k.toLowerCase()) >= 0; });
+                      if (fuzzy) l1 = fuzzy;
+                    }
+                  }
+                  item.tag_l1 = l1;
+                  item.tag_l2 = l2;
                   item.confidence = res.confidence || 0;
                   tagUpdateOneCard(item);
-                  tagLog('[' + (done+1) + '] ✓ "' + item.original.substring(0,20) + '" → ' + res.tag_l1 + '/' + res.tag_l2, 'ok');
+                  tagLog('[' + (done+1) + '] ✓ "' + item.original.substring(0,20) + '" → ' + l1 + '/' + l2, 'ok');
                 }
                 done++;
               }
@@ -1077,8 +1088,15 @@ async function tagStart() {
               var lastItem = chunk[lastPos];
               if (lastRes.error) { errors++; }
               else if (!lastItem._manualEdit) {
-                lastItem.tag_l1 = lastRes.tag_l1;
-                lastItem.tag_l2 = lastRes.tag_l2;
+                var l1r = (lastRes.tag_l1 || '').trim();
+                var l2r = (lastRes.tag_l2 || '').trim();
+                if (l1r) {
+                  var sk = Object.keys(getEnabledSchema());
+                  var ml1 = sk.find(function(k) { return k.toLowerCase() === l1r.toLowerCase(); });
+                  if (ml1) l1r = ml1;
+                }
+                lastItem.tag_l1 = l1r;
+                lastItem.tag_l2 = l2r;
                 lastItem.confidence = lastRes.confidence || 0;
                 tagUpdateOneCard(lastItem);
               }
