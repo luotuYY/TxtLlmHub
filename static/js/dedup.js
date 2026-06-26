@@ -883,7 +883,7 @@ function init() {
     _bind("dedupStrategyToggle", toggleDedupStrategy);
     _bind("dedupStrategyReset", resetDedupStrategy);
 
-    var _bindChange = function(id, fn) { var el = $(id); if (el) el.addEventListener("change", fn); };
+    var _bindChange = function(id, fn) { var el = $(id); if (el) el.addEventListener("blur", fn); };
     _bindChange("dedupTemperature", saveDedupParams);
     _bindChange("dedupTopP", saveDedupParams);
     _bindChange("dedupMaxTokens", saveDedupParams);

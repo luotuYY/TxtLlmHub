@@ -2329,7 +2329,7 @@ function tagInit() {
     if (concEl) concEl.value = savedConcurrency;
   }
   var concInput = document.getElementById('tagConcurrency');
-  if (concInput) concInput.addEventListener('change', function() { dbSet('tllmh_tag_concurrency', parseInt(concInput.value) || 5); });
+  if (concInput) concInput.addEventListener('blur', function() { dbSet('tllmh_tag_concurrency', parseInt(concInput.value) || 5); });
 
   // LLM 参数持久化
   var tagLLMParams = dbGet('tllmh_tag_params', {});
@@ -2338,7 +2338,7 @@ function tagInit() {
     if (!el) return;
     var key = id.replace('tag', '').toLowerCase();
     if (tagLLMParams[key] != null) el.value = tagLLMParams[key];
-    el.addEventListener('change', function() {
+    el.addEventListener('blur', function() {
       var p = dbGet('tllmh_tag_params', {});
       p[key] = el.value;
       dbSet('tllmh_tag_params', p);

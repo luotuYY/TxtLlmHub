@@ -749,8 +749,8 @@ function triggerDownload(filename, fcontent) {
 
   // ── 翻译页：参数输入 ──
   var paramMap = ['temperature','top_p','max_tokens','repetition_penalty','concurrency'];
-  paramMap.forEach(function(id) { _bind(id, 'change', function() { saveModeParams(state.translateMode); }); });
-  _bind('system_prompt', 'change', function() { saveModeParams(state.translateMode); });
+  paramMap.forEach(function(id) { _bind(id, 'blur', function() { saveModeParams(state.translateMode); }); });
+  _bind('system_prompt', 'blur', function() { saveModeParams(state.translateMode); });
   _bind('polish_strategy', 'change', savePolishStrategy);
 
   // ── 翻译页：API 配置 ──
