@@ -762,11 +762,17 @@ function triggerDownload(filename, fcontent) {
   _bind('previewRowLimit', 'change', onPreviewRowLimitChange);
   _bind('previewCustomLimit', 'change', onPreviewCustomLimitChange);
 
-  // ── 翻译页：双击恢复默认参数（统一 resetInputDefault） ──
+  // ── 翻译页：双击 label 恢复默认参数 ──
   var translateParamRow = document.querySelector('#page-translate .param-row');
   if (translateParamRow) {
-    translateParamRow.querySelectorAll('label + input[type="number"]').forEach(function(input) {
-      input.addEventListener('dblclick', function() { resetInputDefault(input, function() { saveModeParams(state.translateMode); }); });
+    translateParamRow.querySelectorAll('label').forEach(function(label) {
+      var input = label.nextElementSibling;
+      if (input && input.type === 'number') {
+        label.addEventListener('dblclick', function() {
+          resetInputDefault(input, function() { saveModeParams(state.translateMode); });
+        });
+        label.style.cursor = 'pointer';
+      }
     });
   }
   // 翻译页并发数双击重置

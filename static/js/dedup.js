@@ -891,11 +891,17 @@ async function init() {
     _bindChange("dedupRepPenalty", saveDedupParams);
     _bindChange("dedupConcurrency", saveDedupParams);
 
-    // 双击恢复默认值（统一 resetInputDefault）
+    // 双击 label 恢复默认值
     var dedupParamRow = document.querySelector('#page-dedup .param-row');
     if (dedupParamRow) {
-      dedupParamRow.querySelectorAll('label + input[type="number"]').forEach(function(input) {
-        input.addEventListener('dblclick', function() { resetInputDefault(input, saveDedupParams); });
+      dedupParamRow.querySelectorAll('label').forEach(function(label) {
+        var input = label.nextElementSibling;
+        if (input && input.type === 'number') {
+          label.addEventListener('dblclick', function() {
+            resetInputDefault(input, saveDedupParams);
+          });
+          label.style.cursor = 'pointer';
+        }
       });
     }
     // 去重页并发数双击重置
