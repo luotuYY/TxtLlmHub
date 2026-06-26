@@ -5,7 +5,7 @@
  */
 
 import { $, escHtml, setHighlight, hl, matches, naturalCompare } from './utils.js';
-import { state } from './state.js';
+import { state, updateExportCheckedButton } from './state.js';
 // ── 文件过滤 ──
 function getCheckedFileNames() {
   return state.files.filter(function (f) { return f.checked; }).map(function (f) { return f.name; });
