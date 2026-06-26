@@ -1550,6 +1550,254 @@ function tagRenderCatPanel() {
 }
 
 // ── 标签管理面板(增删改一级/二级类目) ──
+// ═══════════════════════════════════════════════
+// 标签管理弹窗
+// ═══════════════════════════════════════════════
+
+// ── 从管理面板 DOM 读取当前 schema 状态 ──
+function _readAdminSchema() {
+  var schema = {};
+  document.querySelectorAll('.tag-admin-group').forEach(function(group) {
+    var nameInput = group.querySelector('.tag-admin-name');
+    var l1 = nameInput ? (nameInput.value || nameInput.defaultValue || '').trim() : '';
+    if (!l1) return;
+    var color = group.querySelector('.tag-admin-color');
+    var icon = group.querySelector('.tag-admin-icon');
+    var enabled = group.querySelector('.tag-admin-enabled');
+    var subs = [];
+    group.querySelectorAll('.tag-admin-sub').forEach(function(inp) {
+      var val = (inp.value || inp.defaultValue || '').trim();
+      if (val) subs.push(val);
+    });
+    schema[l1] = {
+      color: color ? color.value : '#888',
+      icon: icon ? (icon.value || icon.defaultValue || '📌') : '📌',
+      subs: subs.length > 0 ? subs : ['未分类'],
+      enabled: enabled ? enabled.checked : true
+    };
+  });
+  return schema;
+}
+
+// ── 从管理面板 DOM 读取当前池子状态 ──
+function _readAdminPool() {
+  var pool = [];
+  document.querySelectorAll('.tag-admin-pool-chip').forEach(function(chip) {
+    var txt = chip.querySelector('.tag-admin-pool-text');
+    if (txt) pool.push(txt.textContent.trim());
+  });
+  return pool;
+}
+
+// ── 实时预览（不写 DB） ──
+function _adminPreview() {
+  var schema = _readAdminSchema();
+  if (Object.keys(schema).length > 0) dbSet('tllmh_tag_schema', schema);
+  saveSubPool(_readAdminPool());
+  tagRenderColumns(); tagRenderPreview(); tagRenderCatPanel(); tagBtnState();
+}
+
+// ── 保存并关闭 ──
+function _adminSave() {
+  var schema = _readAdminSchema();
+  if (Object.keys(schema).length === 0) { showToast('至少保留一个一级类目'); return; }
+  saveTagSchema(schema);
+  saveSubPool(_readAdminPool());
+  document.getElementById('tagAdminModal').style.display = 'none';
+  tagRenderColumns(); tagRenderPreview(); tagRenderCatPanel(); tagBtnState();
+  showToast('标签体系已更新');
+}
+
+// ── 创建子项元素 ──
+function _createSubWrap(name) {
+  var wrap = document.createElement('span');
+  wrap.className = 'tag-admin-sub-wrap';
+  wrap.draggable = true;
+
+  var input = document.createElement('input');
+  input.className = 'tag-admin-sub';
+  input.value = name || '';
+  input.readOnly = true;
+
+  var del = document.createElement('span');
+  del.className = 'tag-admin-sub-del';
+  del.title = '移回二级池';
+  del.textContent = '\u00d7';
+  del.addEventListener('click', function() { _adminRemoveSub(wrap); });
+
+  // 拖拽
+  wrap.addEventListener('dragstart', function(e) {
+    e.dataTransfer.setData('text/plain', (input.value || input.defaultValue || '').trim());
+    e.dataTransfer.setData('source', 'sub');
+    e.dataTransfer.effectAllowed = 'move';
+    wrap.classList.add('drag-start');
+  });
+  wrap.addEventListener('dragend', function() { wrap.classList.remove('drag-start'); });
+
+  // 双击编辑
+  input.addEventListener('dblclick', function() { input.readOnly = false; input.focus(); input.select(); });
+  input.addEventListener('blur', function() { input.readOnly = true; _adminPreview(); });
+  input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+
+  wrap.appendChild(input);
+  wrap.appendChild(del);
+  return wrap;
+}
+
+// ── 创建类目组元素 ──
+function _createGroup(l1, cat) {
+  var group = document.createElement('div');
+  group.className = 'tag-admin-group' + (cat.enabled === false ? ' tag-admin-disabled' : '');
+  group.dataset.l1 = l1;
+
+  // Header
+  var header = document.createElement('div');
+  header.className = 'tag-admin-group-header';
+
+  // 启用/禁用
+  var label = document.createElement('label');
+  label.className = 'tag-admin-enabled-wrap';
+  label.title = '启用/禁用';
+  var checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'tag-admin-enabled';
+  checkbox.checked = cat.enabled !== false;
+  checkbox.addEventListener('change', function() {
+    group.classList.toggle('tag-admin-disabled', !checkbox.checked);
+    _adminPreview();
+  });
+  label.appendChild(checkbox);
+  header.appendChild(label);
+
+  // 图标
+  var iconInput = document.createElement('input');
+  iconInput.className = 'tag-admin-icon';
+  iconInput.value = cat.icon || '📌';
+  iconInput.style.cssText = 'width:30px;text-align:center';
+  iconInput.addEventListener('change', _adminPreview);
+  header.appendChild(iconInput);
+
+  // 名称
+  var nameInput = document.createElement('input');
+  nameInput.className = 'tag-admin-name';
+  nameInput.value = l1;
+  nameInput.style.flex = '1';
+  nameInput.readOnly = true;
+  nameInput.addEventListener('dblclick', function() { nameInput.readOnly = false; nameInput.focus(); nameInput.select(); });
+  nameInput.addEventListener('blur', function() { nameInput.readOnly = true; _adminPreview(); });
+  nameInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); nameInput.blur(); } });
+  header.appendChild(nameInput);
+
+  // 颜色
+  var colorInput = document.createElement('input');
+  colorInput.type = 'color';
+  colorInput.className = 'tag-admin-color';
+  colorInput.value = cat.color || '#888';
+  colorInput.title = '颜色';
+  colorInput.addEventListener('change', _adminPreview);
+  header.appendChild(colorInput);
+
+  // +子项
+  var addSubBtn = document.createElement('button');
+  addSubBtn.className = 'btn btn-sm';
+  addSubBtn.textContent = '+子项';
+  addSubBtn.addEventListener('click', function() {
+    var wrap = _createSubWrap('');
+    subsDiv.appendChild(wrap);
+    var inp = wrap.querySelector('.tag-admin-sub');
+    inp.readOnly = false; inp.focus();
+  });
+  header.appendChild(addSubBtn);
+
+  // 删除类目
+  var delBtn = document.createElement('button');
+  delBtn.className = 'btn btn-sm tag-admin-del-btn';
+  delBtn.textContent = '\uD83D\uDDD1';
+  delBtn.addEventListener('click', function() { _adminRemoveGroup(group); });
+  header.appendChild(delBtn);
+
+  group.appendChild(header);
+
+  // Subs container
+  var subsDiv = document.createElement('div');
+  subsDiv.className = 'tag-admin-subs';
+  (cat.subs || []).forEach(function(sub) {
+    subsDiv.appendChild(_createSubWrap(sub));
+  });
+  group.appendChild(subsDiv);
+
+  // Drop zone
+  group.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; group.classList.add('drag-over'); });
+  group.addEventListener('dragleave', function() { group.classList.remove('drag-over'); });
+  group.addEventListener('drop', function(e) { _adminDrop(e, group); });
+
+  return group;
+}
+
+// ── 创建池子芯片 ──
+function _createPoolChip(name) {
+  var chip = document.createElement('div');
+  chip.className = 'tag-admin-pool-chip';
+  chip.draggable = true;
+
+  var text = document.createElement('span');
+  text.className = 'tag-admin-pool-text';
+  text.textContent = name;
+
+  var del = document.createElement('span');
+  del.className = 'tag-admin-pool-del';
+  del.title = '永久删除';
+  del.textContent = '\u00d7';
+  del.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var n = text.textContent.trim();
+    var pool = getSubPool(); var idx = pool.indexOf(n);
+    if (idx !== -1) { pool.splice(idx, 1); saveSubPool(pool); }
+    chip.remove();
+    _refreshPool();
+    _adminPreview();
+  });
+
+  // 拖拽
+  chip.addEventListener('dragstart', function(e) {
+    e.dataTransfer.setData('text/plain', text.textContent);
+    e.dataTransfer.setData('source', 'pool');
+    e.dataTransfer.effectAllowed = 'move';
+    chip.classList.add('drag-start');
+  });
+  chip.addEventListener('dragend', function() { chip.classList.remove('drag-start'); });
+
+  // 双击编辑
+  chip.addEventListener('dblclick', function(e) {
+    if (e.target === del) return;
+    var oldName = text.textContent;
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.value = oldName; inp.className = 'tag-admin-sub';
+    inp.style.cssText = 'width:calc(100% - 18px);padding:2px 4px;font-size:0.73rem';
+    text.replaceWith(inp); inp.focus(); inp.select();
+    function commit() {
+      var newName = inp.value.trim();
+      if (newName && newName !== oldName) {
+        var pool = getSubPool(); var idx = pool.indexOf(oldName);
+        if (idx !== -1) { pool[idx] = newName; saveSubPool(pool); }
+      }
+      text.textContent = newName || oldName;
+      inp.replaceWith(text);
+      _adminPreview();
+    }
+    inp.addEventListener('blur', commit);
+    inp.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+      if (ev.key === 'Escape') { inp.value = oldName; commit(); }
+    });
+  });
+
+  chip.appendChild(text);
+  chip.appendChild(del);
+  return chip;
+}
+
+// ── 打开管理面板 ──
 function tagOpenAdmin() {
   var schema = getTagSchema();
   var subPool = getSubPool();
@@ -1563,144 +1811,155 @@ function tagOpenAdmin() {
     modal.id = 'tagAdminModal';
     modal.className = 'modal-overlay';
     modal.style.display = 'none';
-    modal.innerHTML =
-      '<div class="modal-box tag-admin-modal">' +
-        '<div class="modal-msg" style="font-weight:600;margin-bottom:6px">📌 管理分类标签</div>' +
-        '<div id="tagAdminBody" class="tag-admin-layout">' +
-          '<div class="tag-admin-left" id="tagAdminLeft"></div>' +
-          '<div class="tag-admin-right">' +
-            '<div style="font-size:0.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px">二级类目池</div>' +
-            '<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:6px">拖入左侧分配 | 双击编辑 | 仅此处可删除</div>' +
-            '<div class="tag-admin-pool" id="tagAdminPool" data-action="tag-admin-pool-drop"></div>' +
-            '<div style="display:flex;gap:4px;margin-top:8px">' +
-            '<input id="tagAdminPoolInput" class="tag-admin-pool-input" placeholder="输入新二级类目" style="flex:1"' +
-            ' onkeydown="if(event.key===\'Enter\')tagAdminAddToPool()">' +
-            '<button class="btn btn-sm" data-action="tag-admin-add-pool">+</button>' +
-          '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="modal-actions" style="margin-top:10px">' +
-          '<button class="btn" data-action="tag-admin-export">导出</button>' +
-          '<button class="btn" data-action="tag-admin-import">导入</button>' +
-          '<span style="flex:1"></span>' +
-          '<button class="btn btn-primary" id="tagAdminSave">保存并关闭</button>' +
-          '<button class="btn" id="tagAdminCancel">取消</button>' +
-        '</div>' +
-      '</div>';
+
+    var box = document.createElement('div');
+    box.className = 'modal-box tag-admin-modal';
+
+    // Title
+    var title = document.createElement('div');
+    title.className = 'modal-msg';
+    title.style.cssText = 'font-weight:600;margin-bottom:6px';
+    title.textContent = '\uD83D\uDCCC 管理分类标签';
+    box.appendChild(title);
+
+    // Layout
+    var layout = document.createElement('div');
+    layout.id = 'tagAdminBody';
+    layout.className = 'tag-admin-layout';
+
+    // Left panel
+    var left = document.createElement('div');
+    left.className = 'tag-admin-left';
+    left.id = 'tagAdminLeft';
+    layout.appendChild(left);
+
+    // Right panel (pool)
+    var right = document.createElement('div');
+    right.className = 'tag-admin-right';
+
+    var poolTitle = document.createElement('div');
+    poolTitle.style.cssText = 'font-size:0.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px';
+    poolTitle.textContent = '二级类目池';
+    right.appendChild(poolTitle);
+
+    var poolHint = document.createElement('div');
+    poolHint.style.cssText = 'font-size:0.65rem;color:var(--text-muted);margin-bottom:6px';
+    poolHint.textContent = '拖入左侧分配 | 双击编辑 | 仅此处可删除';
+    right.appendChild(poolHint);
+
+    var poolContainer = document.createElement('div');
+    poolContainer.className = 'tag-admin-pool';
+    poolContainer.id = 'tagAdminPool';
+    // Pool drop zone
+    poolContainer.addEventListener('dragover', function(e) { e.preventDefault(); });
+    poolContainer.addEventListener('drop', function(e) { _adminPoolDrop(e); });
+    right.appendChild(poolContainer);
+
+    var poolInputRow = document.createElement('div');
+    poolInputRow.style.cssText = 'display:flex;gap:4px;margin-top:8px';
+    var poolInput = document.createElement('input');
+    poolInput.id = 'tagAdminPoolInput';
+    poolInput.className = 'tag-admin-pool-input';
+    poolInput.placeholder = '输入新二级类目';
+    poolInput.style.flex = '1';
+    poolInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') _adminAddToPool(); });
+    poolInputRow.appendChild(poolInput);
+    var poolAddBtn = document.createElement('button');
+    poolAddBtn.className = 'btn btn-sm';
+    poolAddBtn.textContent = '+';
+    poolAddBtn.addEventListener('click', _adminAddToPool);
+    poolInputRow.appendChild(poolAddBtn);
+    right.appendChild(poolInputRow);
+
+    layout.appendChild(right);
+    box.appendChild(layout);
+
+    // Actions
+    var actions = document.createElement('div');
+    actions.className = 'modal-actions';
+    actions.style.marginTop = '10px';
+
+    var exportBtn = document.createElement('button');
+    exportBtn.className = 'btn';
+    exportBtn.textContent = '导出';
+    exportBtn.addEventListener('click', _adminExport);
+    actions.appendChild(exportBtn);
+
+    var importBtn = document.createElement('button');
+    importBtn.className = 'btn';
+    importBtn.textContent = '导入';
+    importBtn.addEventListener('click', _adminImport);
+    actions.appendChild(importBtn);
+
+    var spacer = document.createElement('span');
+    spacer.style.flex = '1';
+    actions.appendChild(spacer);
+
+    var saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-primary';
+    saveBtn.id = 'tagAdminSave';
+    saveBtn.textContent = '保存并关闭';
+    saveBtn.addEventListener('click', _adminSave);
+    actions.appendChild(saveBtn);
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn';
+    cancelBtn.id = 'tagAdminCancel';
+    cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', function() { modal.style.display = 'none'; });
+    actions.appendChild(cancelBtn);
+
+    box.appendChild(actions);
+    modal.appendChild(box);
     document.body.appendChild(modal);
     modal.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
-    document.getElementById('tagAdminCancel').onclick = function() { modal.style.display = 'none'; };
-    document.getElementById('tagAdminSave').onclick = _adminSave;
   }
 
-  var leftHtml = '<div class="tag-admin-hint">双击名称编辑 | 删除类目子项回归二级池</div>';
-  leftHtml += '<div id="tagAdminList">';
+  // Render left panel
+  var leftEl = document.getElementById('tagAdminLeft');
+  leftEl.innerHTML = '';
+  var hint = document.createElement('div');
+  hint.className = 'tag-admin-hint';
+  hint.textContent = '双击名称编辑 | 删除类目子项回归二级池';
+  leftEl.appendChild(hint);
+
+  var list = document.createElement('div');
+  list.id = 'tagAdminList';
   Object.keys(schema).forEach(function(l1) {
-    var cat = schema[l1];
-    var disabledCls = cat.enabled === false ? ' tag-admin-disabled' : '';
-    leftHtml +=
-      '<div class="tag-admin-group' + disabledCls + '" data-l1="' + escHtml(l1) + '"' +
-        ' data-action="tag-admin-group">' +
-        '<div class="tag-admin-group-header">' +
-          '<label class="tag-admin-enabled-wrap" title="启用/禁用">' +
-            '<input type="checkbox" class="tag-admin-enabled"' + (cat.enabled !== false ? ' checked' : '') +
-              ' data-action="admin-toggle-group">' +
-          '</label>' +
-          '<input class="tag-admin-icon" value="' + escHtml(cat.icon || '📌') + '" data-action="auto-save" style="width:30px;text-align:center">' +
-          '<input class="tag-admin-name" value="' + escHtml(l1) + '" style="flex:1"' +
-            ' data-action="make-editable" data-lock="save"' +
-            ' readonly">' +
-          '<input class="tag-admin-color" type="color" value="' + (cat.color || '#888') + '" data-action="auto-save" title="颜色">' +
-          '<button class="btn btn-sm" data-action="tag-admin-add-sub">+子项</button>' +
-          '<button class="btn btn-sm tag-admin-del-btn" data-action="tag-admin-remove-group">🗑</button>' +
-        '</div>' +
-        '<div class="tag-admin-subs">';
-    (cat.subs || []).forEach(function(sub) {
-      leftHtml += '<span class="tag-admin-sub-wrap" draggable="true"' +
-        ' data-action="tag-admin-sub">' +
-        '<input class="tag-admin-sub" value="' + escHtml(sub) + '"' +
-          ' data-action="make-editable" data-lock="save"' +
-          ' readonly">' +
-        '<span class="tag-admin-sub-del" data-action="tag-admin-remove-sub" title="移回二级池">&times;</span>' +
-      '</span>';
-    });
-    leftHtml += '</div></div>';
+    list.appendChild(_createGroup(l1, schema[l1]));
   });
-  leftHtml += '</div>';
-  leftHtml += '<button class="btn btn-sm" data-action="tag-admin-add-group" style="margin-top:4px">+ 添加一级类目</button>';
-  document.getElementById('tagAdminLeft').innerHTML = leftHtml;
+  leftEl.appendChild(list);
 
-  var poolHtml = '';
-  availablePool.forEach(function(name) {
-    poolHtml +=
-      '<div class="tag-admin-pool-chip" draggable="true"' +
-        ' data-action="tag-admin-pool-chip">' +
-        '<span class="tag-admin-pool-text">' + escHtml(name) + '</span>' +
-        '<span class="tag-admin-pool-del" data-action="tag-admin-del-pool-item" title="永久删除">&times;</span>' +
-      '</div>';
+  var addGroupBtn = document.createElement('button');
+  addGroupBtn.className = 'btn btn-sm';
+  addGroupBtn.style.marginTop = '4px';
+  addGroupBtn.textContent = '+ 添加一级类目';
+  addGroupBtn.addEventListener('click', function() {
+    var colors = ['#4fc3f7','#81c784','#ef5350','#ffb74d','#ce93d8','#90a4ae','#a1887f','#4dd0e1','#f06292','#aed581'];
+    var used = new Set(); document.querySelectorAll('.tag-admin-color').forEach(function(c) { used.add(c.value); });
+    var avail = colors.filter(function(c) { return !used.has(c); });
+    var color = avail.length > 0 ? avail[Math.floor(Math.random() * avail.length)] : colors[Math.floor(Math.random() * colors.length)];
+    var grp = _createGroup('新类目', { icon: '📌', color: color, subs: [], enabled: true });
+    list.appendChild(grp);
+    var nameInp = grp.querySelector('.tag-admin-name');
+    nameInp.readOnly = false; nameInp.focus(); nameInp.select();
   });
-  if (poolHtml === '') {
-    poolHtml = '<div style="font-size:0.68rem;color:var(--text-muted);text-align:center;padding:12px 0">池中暂无二级类目<br>点击下方按钮添加</div>';
-  }
-  document.getElementById('tagAdminPool').innerHTML = poolHtml;
+  leftEl.appendChild(addGroupBtn);
+
+  // Render pool
+  _refreshPool();
 
   modal.style.display = 'flex';
 }
 
-
-function tagAdminAddSub(btn) {
-  var wrapper = btn.closest('.tag-admin-group').querySelector('.tag-admin-subs');
-  var span = document.createElement('span');
-  span.className = 'tag-admin-sub-wrap';
-  span.draggable = true;
-  span.setAttribute('data-action', 'tag-admin-sub');
-  span.innerHTML = '<input class="tag-admin-sub" placeholder="新子项" value="">' +
-    '<span class="tag-admin-sub-del" data-action="tag-admin-remove-sub" title="移回二级池">&times;</span>';
-  wrapper.appendChild(span);
-  span.querySelector('input').focus();
-}
-
-
-function _randomAdminColor() {
-  var palette = ['#4fc3f7','#81c784','#ef5350','#ffb74d','#ce93d8','#90a4ae','#a1887f','#4dd0e1','#f06292','#aed581'];
-  var used = new Set();
-  document.querySelectorAll('.tag-admin-color').forEach(function(c) { used.add(c.value); });
-  var available = palette.filter(function(c) { return !used.has(c); });
-  if (available.length === 0) available = palette;
-  return available[Math.floor(Math.random() * available.length)];
-}
-
-function tagAdminAddGroup() {
-  var list = document.getElementById('tagAdminList');
-  var newGroup = document.createElement('div');
-  newGroup.className = 'tag-admin-group';
-  newGroup.setAttribute('data-action', 'tag-admin-group');
-  newGroup.dataset.l1 = '新类目';
-  newGroup.innerHTML = '<div class="tag-admin-group-header">' +
-    '<label class="tag-admin-enabled-wrap" title="启用/禁用">' +
-      '<input type="checkbox" class="tag-admin-enabled" checked data-action="admin-toggle-group">' +
-    '</label>' +
-    '<input class="tag-admin-icon" value="📌" data-action="auto-save" style="width:30px;text-align:center">' +
-    '<input class="tag-admin-name" value="新类目" data-action="make-editable" data-lock="save" readonly style="flex:1">' +
-    '<input class="tag-admin-color" type="color" value=' + _randomAdminColor() + ' data-action="auto-save">' +
-    '<button class="btn btn-sm" data-action="tag-admin-add-sub">+子项</button>' +
-    '<button class="btn btn-sm tag-admin-del-btn" data-action="tag-admin-remove-group">🗑</button>' +
-  '</div>' +
-  '<div class="tag-admin-subs"></div>';
-  list.appendChild(newGroup);
-  newGroup.querySelector('.tag-admin-name').focus();
-  
-}
-
-function tagAdminRemoveGroup(btn) {
+// ── 类目组操作 ──
+function _adminRemoveGroup(group) {
   if (document.querySelectorAll('.tag-admin-group').length <= 1) {
-    showToast('至少保留一个一级类目');
-    return;
+    showToast('至少保留一个一级类目'); return;
   }
-  var group = btn.closest('.tag-admin-group');
-  var subInputs = group.querySelectorAll('.tag-admin-sub');
+  // 将子项归还池子
   var pool = getSubPool();
-  subInputs.forEach(function(input) {
+  group.querySelectorAll('.tag-admin-sub').forEach(function(input) {
     var val = (input.value || input.defaultValue || '').trim();
     if (val && pool.indexOf(val) === -1) pool.push(val);
   });
@@ -1710,151 +1969,98 @@ function tagAdminRemoveGroup(btn) {
   _adminPreview();
 }
 
-
-// ── 从一级类目下移除子项（回归二级池） ──
-function tagAdminRemoveSub(el) {
-  var input = el.parentElement.querySelector('.tag-admin-sub');
+function _adminRemoveSub(wrap) {
+  var input = wrap.querySelector('.tag-admin-sub');
   var name = (input.value || input.defaultValue || '').trim();
-  el.parentElement.remove();
-  if (name) { var pool = getSubPool(); if (pool.indexOf(name) === -1) { pool.push(name); saveSubPool(pool); } _refreshPool(); }
+  wrap.remove();
+  if (name) {
+    var pool = getSubPool();
+    if (pool.indexOf(name) === -1) { pool.push(name); saveSubPool(pool); }
+    _refreshPool();
+  }
   _adminPreview();
 }
 
-// ── 池子拖拽事件 ──
-function tagAdminPoolDragStart(e, el) {
-  e.dataTransfer.setData('text/plain', el.querySelector('.tag-admin-pool-text').textContent);
-  e.dataTransfer.setData('source', 'pool');
-  e.dataTransfer.effectAllowed = 'move'; el.classList.add('drag-start');
-  setTimeout(function() { if (el) el.classList.remove('drag-start'); }, 0);
-}
-function tagAdminPoolDragEnd(e, el) { el.classList.remove('drag-start'); }
-
-// ── 一级类目 drop 区域 ──
-function tagAdminDragOver(e, group) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; group.classList.add('drag-over'); }
-function tagAdminDragLeave(e, group) { group.classList.remove('drag-over'); }
-function tagAdminDrop(e, group) {
+// ── 拖放处理 ──
+function _adminDrop(e, group) {
   e.preventDefault(); group.classList.remove('drag-over');
   var name = e.dataTransfer.getData('text/plain');
   if (!name) return;
   var isSub = e.dataTransfer.getData('source') === 'sub';
-  
-  // Find target sub-wrap under mouse for position-aware insertion
   var targetWrap = e.target.closest('.tag-admin-sub-wrap');
   var subsDiv = group.querySelector('.tag-admin-subs');
-  
-  // Same-group reorder: if the dragged item is already in this group, just move it
+
+  // 同组内排序
   if (isSub) {
-    var existingInGroup = null;
-    group.querySelectorAll('.tag-admin-sub-wrap').forEach(function(wrap) {
-      var inp = wrap.querySelector('.tag-admin-sub');
-      if (inp && (inp.value || inp.defaultValue || '').trim() === name) existingInGroup = wrap;
+    var existing = null;
+    group.querySelectorAll('.tag-admin-sub-wrap').forEach(function(w) {
+      var inp = w.querySelector('.tag-admin-sub');
+      if (inp && (inp.value || inp.defaultValue || '').trim() === name) existing = w;
     });
-    if (existingInGroup) {
-      // Reorder within same group
-      if (targetWrap && targetWrap !== existingInGroup) {
+    if (existing) {
+      if (targetWrap && targetWrap !== existing) {
         var rect = targetWrap.getBoundingClientRect();
-        if (e.clientY < rect.top + rect.height / 2) {
-          subsDiv.insertBefore(existingInGroup, targetWrap);
-        } else {
-          subsDiv.insertBefore(existingInGroup, targetWrap.nextSibling);
-        }
+        if (e.clientY < rect.top + rect.height / 2) subsDiv.insertBefore(existing, targetWrap);
+        else subsDiv.insertBefore(existing, targetWrap.nextSibling);
         _adminPreview();
       }
       return;
     }
   }
-  
-  // Cross-group: check duplicates
-  var existingSubs = group.querySelectorAll('.tag-admin-sub');
-  for (var i = 0; i < existingSubs.length; i++) {
-    if ((existingSubs[i].value || existingSubs[i].defaultValue || '').trim() === name) {
-      _refreshPool(); return;
-    }
-  }
-  
+
+  // 跨组：检查重复
+  var dup = false;
+  group.querySelectorAll('.tag-admin-sub').forEach(function(inp) {
+    if ((inp.value || inp.defaultValue || '').trim() === name) dup = true;
+  });
+  if (dup) { _refreshPool(); return; }
+
+  // 从源移除
   if (isSub) {
-    // Remove from source group
-    var allWraps = document.querySelectorAll('.tag-admin-sub-wrap');
-    allWraps.forEach(function(wrap) {
-      var input = wrap.querySelector('.tag-admin-sub');
-      var subName = (input.value || input.defaultValue || '').trim();
-      if (subName === name) { wrap.remove(); }
+    document.querySelectorAll('.tag-admin-sub-wrap').forEach(function(w) {
+      var inp = w.querySelector('.tag-admin-sub');
+      if (inp && (inp.value || inp.defaultValue || '').trim() === name) w.remove();
     });
   } else {
-    // Remove from pool
     var pool = getSubPool(); var idx = pool.indexOf(name);
-    if (idx !== -1) { pool.splice(idx, 1); saveSubPool(pool); }
-    else return;
+    if (idx !== -1) { pool.splice(idx, 1); saveSubPool(pool); } else return;
   }
-  
-  // Create and insert at position
-  var subHtml = '<span class="tag-admin-sub-wrap" draggable="true"' +
-    ' data-action="tag-admin-sub">' +
-    '<input class="tag-admin-sub" value="' + escHtml(name) + '" data-action="make-editable" data-lock="save" readonly>' +
-    '<span class="tag-admin-sub-del" data-action="tag-admin-remove-sub" title="移回二级池">&times;</span>' +
-  '</span>';
-  var temp = document.createElement('div'); temp.innerHTML = subHtml; var newEl = temp.firstElementChild;
+
+  // 插入到目标位置
+  var newWrap = _createSubWrap(name);
   if (targetWrap && targetWrap.parentElement === subsDiv) {
     var rect = targetWrap.getBoundingClientRect();
-    if (e.clientY < rect.top + rect.height / 2) {
-      subsDiv.insertBefore(newEl, targetWrap);
-    } else {
-      subsDiv.insertBefore(newEl, targetWrap.nextSibling);
-    }
+    if (e.clientY < rect.top + rect.height / 2) subsDiv.insertBefore(newWrap, targetWrap);
+    else subsDiv.insertBefore(newWrap, targetWrap.nextSibling);
   } else {
-    subsDiv.appendChild(newEl);
+    subsDiv.appendChild(newWrap);
   }
   _refreshPool();
   _adminPreview();
 }
 
-// ── 池子双击编辑 ──
-function tagAdminPoolEdit(e, el) {
-  if (e.target.classList.contains('tag-admin-pool-del')) return;
-  var textSpan = el.querySelector('.tag-admin-pool-text');
-  var oldName = textSpan.textContent;
-  var input = document.createElement('input');
-  input.type = 'text'; input.value = oldName; input.className = 'tag-admin-sub';
-  input.style.cssText = 'width:calc(100% - 18px);padding:2px 4px;font-size:0.73rem';
-  textSpan.replaceWith(input); input.focus(); input.select();
-  function commit() {
-    var newName = input.value.trim();
-    if (newName && newName !== oldName) {
-      var pool = getSubPool(); var idx = pool.indexOf(oldName);
-      if (idx !== -1) { pool[idx] = newName; saveSubPool(pool); }
-    }
-    var span = document.createElement('span'); span.className = 'tag-admin-pool-text'; span.textContent = newName || oldName; input.replaceWith(span);
-    _adminPreview();
-    
-  }
-  input.addEventListener('blur', commit);
-  input.addEventListener('keydown', function(ev) {
-    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
-    if (ev.key === 'Escape') { input.value = oldName; commit(); }
+function _adminPoolDrop(e) {
+  e.preventDefault();
+  var name = e.dataTransfer.getData('text/plain');
+  if (!name || e.dataTransfer.getData('source') !== 'sub') return;
+  document.querySelectorAll('.tag-admin-sub-wrap').forEach(function(w) {
+    var inp = w.querySelector('.tag-admin-sub');
+    if (inp && (inp.value || inp.defaultValue || '').trim() === name) w.remove();
   });
-}
-
-// ── 永久删除池子条目 ──
-function tagAdminDeletePoolItem(e, el) {
-  e.stopPropagation();
-  var chip = el.closest('.tag-admin-pool-chip');
-  if (!chip) return;
-  var nameEl = chip.querySelector('.tag-admin-pool-text');
-  if (!nameEl) return;
-  var name = nameEl.textContent;
-  var pool = getSubPool(); var idx = pool.indexOf(name); if (idx !== -1) { pool.splice(idx, 1); saveSubPool(pool); }
-  chip.remove();
-  if (document.querySelectorAll('.tag-admin-pool-chip').length === 0) _refreshPool();
+  var pool = getSubPool();
+  if (pool.indexOf(name) === -1) { pool.push(name); saveSubPool(pool); }
+  _refreshPool();
   _adminPreview();
 }
 
-// ── 添加新条目到池子 ──
-function tagAdminAddToPool() {
+// ── 池子操作 ──
+function _adminAddToPool() {
   var input = document.getElementById('tagAdminPoolInput');
   if (!input) return;
   var name = input.value.trim();
   if (!name) return;
-  var pool = getSubPool(); if (pool.indexOf(name) !== -1) { showToast('此名称已存在'); return; }
+  var pool = getSubPool();
+  if (pool.indexOf(name) !== -1) { showToast('此名称已存在'); return; }
   var schema = getTagSchema(); var assigned = false;
   Object.keys(schema).forEach(function(l1) { if ((schema[l1].subs || []).indexOf(name) !== -1) assigned = true; });
   if (assigned) { showToast('该名称已在分类中使用'); return; }
@@ -1865,166 +2071,55 @@ function tagAdminAddToPool() {
   input.focus();
 }
 
-// ── 左侧子项拖拽 ──
-function tagAdminSubDragStart(e, el) {
-  var input = el.querySelector('.tag-admin-sub');
-  var name = (input.value || input.defaultValue || '').trim();
-  e.dataTransfer.setData('text/plain', name);
-  e.dataTransfer.setData('source', 'sub');
-  e.dataTransfer.effectAllowed = 'move';
-  el.classList.add('drag-start');
-}
-function tagAdminSubDragEnd(e, el) { el.classList.remove('drag-start'); }
-
-// ── 池子接收拖入的子项 ──
-function tagAdminPoolDrop(e) {
-  e.preventDefault();
-  var name = e.dataTransfer.getData('text/plain');
-  var source = e.dataTransfer.getData('source');
-  if (!name || source !== 'sub') return;
-  // 从左侧DOM移除
-  var wraps = document.querySelectorAll('.tag-admin-sub-wrap');
-  wraps.forEach(function(wrap) {
-    var input = wrap.querySelector('.tag-admin-sub');
-    var subName = (input.value || input.defaultValue || '').trim();
-    if (subName === name) { wrap.remove(); }
-  });
-  // 加入池子
-  var pool = getSubPool();
-  if (pool.indexOf(name) === -1) { pool.push(name); saveSubPool(pool); }
-  _refreshPool();
-  _adminPreview();
-}
-
-// ── 刷新右侧池子 DOM ──
 function _refreshPool() {
-  var container = document.getElementById('tagAdminPool'); if (!container) return;
+  var container = document.getElementById('tagAdminPool');
+  if (!container) return;
+  container.innerHTML = '';
   var subPool = getSubPool();
   var assignedSubs = new Set();
-  // 从当前DOM扫描已分配的子项（反映未保存的拖拽/删除操作）
   document.querySelectorAll('.tag-admin-sub').forEach(function(input) {
     var val = (input.value || input.defaultValue || '').trim();
     if (val) assignedSubs.add(val);
   });
   var available = subPool.filter(function(s) { return !assignedSubs.has(s); });
-  if (available.length === 0) { container.innerHTML = '<div style="font-size:0.68rem;color:var(--text-muted);text-align:center;padding:12px 0">池中暂无二级类目<br>点击下方按钮添加</div>'; return; }
-  var html = '';
-  available.forEach(function(name) {
-    html += '<div class="tag-admin-pool-chip" draggable="true" data-action="tag-admin-pool-chip">' +
-      '<span class="tag-admin-pool-text">' + escHtml(name) + '</span>' +
-      '<span class="tag-admin-pool-del" data-action="tag-admin-del-pool-item" title="永久删除">&times;</span>' +
-    '</div>';
-  });
-  container.innerHTML = html;
+  if (available.length === 0) {
+    var empty = document.createElement('div');
+    empty.style.cssText = 'font-size:0.68rem;color:var(--text-muted);text-align:center;padding:12px 0';
+    empty.innerHTML = '池中暂无二级类目<br>点击下方按钮添加';
+    container.appendChild(empty);
+    return;
+  }
+  available.forEach(function(name) { container.appendChild(_createPoolChip(name)); });
 }
 
-// ── 自动保存(静默, 不关闭弹窗) ──
-function _adminPreview() {
-  // Read current admin DOM state and re-render columns without saving to DB
-  var newSchema = {};
-  var groups = document.querySelectorAll('.tag-admin-group');
-  groups.forEach(function(group) {
-    var nameInput = group.querySelector('.tag-admin-name');
-    var l1 = nameInput ? (nameInput.value || nameInput.defaultValue || '').trim() : '';
-    var color = group.querySelector('.tag-admin-color'); var colorVal = color ? color.value : '#888';
-    var icon = group.querySelector('.tag-admin-icon'); var iconVal = icon ? (icon.value || icon.defaultValue || '📌') : '📌';
-    var enabled = group.querySelector('.tag-admin-enabled'); var enabledVal = enabled ? enabled.checked : true;
-    var subs = [];
-    group.querySelectorAll('.tag-admin-sub').forEach(function(subInput) { var val = (subInput.value || subInput.defaultValue || '').trim(); if (val) subs.push(val); });
-    if (l1) { newSchema[l1] = { color: colorVal, icon: iconVal, subs: subs.length > 0 ? subs : ['未分类'], enabled: enabledVal }; }
-  });
-  // Temporarily override the schema in cache for rendering
-  dbSet('tllmh_tag_schema', newSchema);
-  var poolChips = document.querySelectorAll('.tag-admin-pool-chip'); var newPool = [];
-  poolChips.forEach(function(chip) { var txt = chip.querySelector('.tag-admin-pool-text'); if (txt) newPool.push(txt.textContent.trim()); });
-  saveSubPool(newPool);
-  tagRenderColumns(); tagRenderPreview(); tagRenderCatPanel(); tagBtnState();
-}
-
-function _autoSave() {
-  var newSchema = {};
-  var groups = document.querySelectorAll('.tag-admin-group');
-  groups.forEach(function(group) {
-    var nameInput = group.querySelector('.tag-admin-name');
-    var l1 = nameInput ? (nameInput.value || nameInput.defaultValue || '').trim() : '';
-    var color = group.querySelector('.tag-admin-color'); var colorVal = color ? color.value : '#888';
-    var icon = group.querySelector('.tag-admin-icon'); var iconVal = icon ? (icon.value || icon.defaultValue || '📌') : '📌';
-    var enabled = group.querySelector('.tag-admin-enabled'); var enabledVal = enabled ? enabled.checked : true;
-    var subs = [];
-    group.querySelectorAll('.tag-admin-sub').forEach(function(subInput) { var val = (subInput.value || subInput.defaultValue || '').trim(); if (val) subs.push(val); });
-    if (l1 && subs.length > 0) { newSchema[l1] = { color: colorVal, icon: iconVal, subs: subs, enabled: enabledVal }; }
-  });
-  if (Object.keys(newSchema).length === 0) return;
-  var poolChips = document.querySelectorAll('.tag-admin-pool-chip'); var newPool = [];
-  poolChips.forEach(function(chip) { var txt = chip.querySelector('.tag-admin-pool-text'); if (txt) newPool.push(txt.textContent.trim()); });
-  saveSubPool(newPool); saveTagSchema(newSchema);
-  tagRenderColumns(); tagRenderPreview(); tagRenderCatPanel(); tagBtnState();
-}
-
-// ── 保存逻辑 ──
-function _adminSave() {
-  var modal = document.getElementById('tagAdminModal');
-  var groups = document.querySelectorAll('.tag-admin-group');
-  // Check before auto-save (avoids toast on every silent save)
-  var hasValid = false;
-  groups.forEach(function(group) {
-    var nameInput = group.querySelector('.tag-admin-name');
-    var l1 = nameInput ? (nameInput.value || nameInput.defaultValue || '').trim() : '';
-    var subs = [];
-    group.querySelectorAll('.tag-admin-sub').forEach(function(s) { var val = (s.value || s.defaultValue || '').trim(); if (val) subs.push(val); });
-    if (l1 && subs.length > 0) hasValid = true;
-  });
-  if (!hasValid) { showToast('至少保留一个一级类目'); return; }
-  _autoSave();
-  modal.style.display = 'none';
-  tagRenderColumns(); tagRenderPreview(); tagRenderCatPanel(); tagBtnState();
-  showToast('标签体系已更新');
-}
-
-function tagAdminExport() {
+// ── 导出/导入 ──
+function _adminExport() {
   var schema = getTagSchema();
   var blob = new Blob([JSON.stringify(schema, null, 2)], { type: 'application/json' });
   var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'tag_schema.json';
-  a.click();
+  var a = document.createElement('a'); a.href = url; a.download = 'tag_schema.json'; a.click();
   setTimeout(function(){URL.revokeObjectURL(url);},5000);
   showToast('已导出标签体系');
 }
 
-function tagAdminImport() {
+function _adminImport() {
   var input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json';
+  input.type = 'file'; input.accept = '.json';
   input.onchange = function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
+    var file = e.target.files[0]; if (!file) return;
     var reader = new FileReader();
     reader.onload = function(ev) {
       try {
         var data = JSON.parse(ev.target.result);
-        if (typeof data !== 'object' || data === null || Object.keys(data).length === 0) {
-          showToast('无效的标签体系文件');
-          return;
-        }
-        // 验证结构:每个 key 必须有 subs 数组
+        if (typeof data !== 'object' || data === null || Object.keys(data).length === 0) { showToast('无效的标签体系文件'); return; }
         for (var key in data) {
-          if (!data[key].subs || !Array.isArray(data[key].subs)) {
-            showToast('格式错误:' + key + ' 缺少 subs 数组');
-            return;
-          }
+          if (!data[key].subs || !Array.isArray(data[key].subs)) { showToast('格式错误:' + key + ' 缺少 subs 数组'); return; }
         }
         saveTagSchema(data);
-        // 刷新管理面板
         tagOpenAdmin();
-        tagRenderColumns();
-        tagRenderPreview();
-        tagRenderCatPanel();
+        tagRenderColumns(); tagRenderPreview(); tagRenderCatPanel();
         showToast('已导入标签体系(' + Object.keys(data).length + ' 个类目)');
-      } catch (ex) {
-        showToast('导入失败: ' + ex.message);
-      }
+      } catch (ex) { showToast('导入失败: ' + ex.message); }
     };
     reader.readAsText(file);
   };
@@ -2120,22 +2215,14 @@ function tagInit() {
     else if (action === 'tag-strategy-preset') tagLoadStrategyPreset(parseInt(btn.dataset.index));
   });
 
-  // 标签管理面板
+  // 标签管理面板（旧 data-action 委托已移除，改用直接事件监听）
+  // 保留非 admin 的委托
   document.addEventListener('click', function(e) {
     var btn = e.target.closest('[data-action]');
     if (!btn) return;
     var action = btn.dataset.action;
-    if (action === 'tag-admin-add-pool') tagAdminAddToPool();
-    else if (action === 'tag-admin-export') tagAdminExport();
-    else if (action === 'tag-admin-import') tagAdminImport();
-    else if (action === 'tag-admin-add-sub') tagAdminAddSub(btn);
-    else if (action === 'tag-admin-remove-group') tagAdminRemoveGroup(btn);
-    else if (action === 'tag-admin-remove-sub') tagAdminRemoveSub(btn);
-    else if (action === 'tag-admin-add-group') tagAdminAddGroup();
-    else if (action === 'tag-admin-del-pool-item') tagAdminDeletePoolItem(e, btn);
-    else if (action === 'tag-edit-pick') tagEditPick(btn.dataset.l1, btn.dataset.l2);
-    else if (action === 'make-editable') { btn.readOnly = false; btn.focus(); btn.select(); }
-    else if (action === 'tag-admin-pool-chip') tagAdminPoolEdit(e, btn);
+    if (action === 'tag-edit-pick') tagEditPick(btn.dataset.l1, btn.dataset.l2);
+    else if (action === 'tag-strategy-preset') tagLoadStrategyPreset(parseInt(btn.dataset.index));
   });
 
   // ── 标签页：input/change/blur 委托 ──
@@ -2149,75 +2236,31 @@ function tagInit() {
     tagPage.addEventListener('change', function(e) {
       var el = e.target.closest('[data-action]');
       if (!el) return;
-      var action = el.dataset.action;
-      if (action === 'tag-edit-select-change') tagEditSelectChange();
-      else if (action === 'auto-save' || action === 'admin-toggle-group') {
-        if (action === 'admin-toggle-group') {
-          var group = el.closest('.tag-admin-group');
-          if (group) group.classList.toggle('tag-admin-disabled', !el.checked);
-        }
-        _adminPreview();
-      }
+      if (el.dataset.action === 'tag-edit-select-change') tagEditSelectChange();
     });
-    tagPage.addEventListener('blur', function(e) {
-      var el = e.target.closest('[data-action]');
-      if (!el) return;
-      var lockType = el.getAttribute('data-lock');
-      if (lockType) el.readOnly = true;
-      // Preview on blur for admin panel inputs
-      if (el.classList.contains('tag-admin-name') || el.classList.contains('tag-admin-sub') ||
-          el.classList.contains('tag-admin-icon') || el.classList.contains('tag-admin-color')) {
-        _adminPreview();
-      }
-    }, true);
-    tagPage.addEventListener('dblclick', function(e) {
-      var el = e.target.closest('[data-action]');
-      if (!el) return;
-      if (el.dataset.action === 'make-editable') { el.readOnly = false; el.focus(); el.select(); }
-    });
-    // Drag/drop delegation for tag cards
+    // Drag/drop delegation for tag cards only (admin uses direct listeners)
     tagPage.addEventListener('dragstart', function(e) {
       var el = e.target.closest('[data-action]');
       if (!el) return;
-      var action = el.dataset.action;
-      if (action === 'tag-card') tagCardDragStart(e);
-      else if (action === 'tag-admin-sub') tagAdminSubDragStart(e, el);
-      else if (action === 'tag-admin-pool-chip') tagAdminPoolDragStart(e, el);
+      if (el.dataset.action === 'tag-card') tagCardDragStart(e);
     });
     tagPage.addEventListener('dragend', function(e) {
       var el = e.target.closest('[data-action]');
       if (!el) return;
-      var action = el.dataset.action;
-      if (action === 'tag-card') tagCardDragEnd(e);
-      else if (action === 'tag-admin-sub') tagAdminSubDragEnd(e, el);
-      else if (action === 'tag-admin-pool-chip') tagAdminPoolDragEnd(e, el);
+      if (el.dataset.action === 'tag-card') tagCardDragEnd(e);
     });
     tagPage.addEventListener('dragover', function(e) {
-      // Find the drop container (column body, admin group, or pool)
       var col = e.target.closest('.tag-column-body');
-      var grp = e.target.closest('.tag-admin-group');
-      var pool = e.target.closest('.tag-admin-pool');
       if (col) { e.preventDefault(); tagDragOver(e, col); }
-      else if (grp) { e.preventDefault(); tagAdminDragOver(e, grp); }
-      else if (pool) { e.preventDefault(); }
     });
     tagPage.addEventListener('dragleave', function(e) {
       var col = e.target.closest('.tag-column-body');
-      var grp = e.target.closest('.tag-admin-group');
       if (col) tagDragLeave(e, col);
-      else if (grp) tagAdminDragLeave(e, grp);
     });
     tagPage.addEventListener('drop', function(e) {
       e.preventDefault();
       var col = e.target.closest('.tag-column-body');
-      var grp = e.target.closest('.tag-admin-group');
       if (col) tagDrop(e, col);
-      else if (grp) tagAdminDrop(e, grp);
-      else {
-        // Pool drop
-        var poolEl = e.target.closest('.tag-admin-pool');
-        if (poolEl) tagAdminPoolDrop(e);
-      }
     });
   }
 
