@@ -428,7 +428,7 @@ async function handleFiles(fileList) {
 
       if (data.total_groups > 0) {
         $("dedupBtnStart").disabled = false;
-        $("dedupProgressText").textContent = "待评估 " + data.total_groups + " 组";
+        $("dedupProgressText").textContent = "待评估 " + (data.total_groups - autoSkipped) + " 组";
         showToast("发现 " + data.total_groups + " 个重复组");
       } else {
         $("dedupProgressText").textContent = "无需评估";
