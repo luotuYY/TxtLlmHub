@@ -418,6 +418,26 @@ function _appendCompareRow(l) {
       '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=译文">复制</button>' +
     '</td>';
   tbody.appendChild(tr);
+  _refreshComparePagination();
+}
+
+// ── 刷新对比表分页条（增量追加行时调用，同步总数） ──
+function _refreshComparePagination() {
+  var container = document.getElementById('cardCompare');
+  if (!container) return;
+  var pgBar = container.querySelector('.pagination-bar');
+  if (!pgBar) return;
+  var rows = state.lines.filter(function (l) { return l.new_translation || l.error; });
+  var total = rows.length;
+  var perPage = state.previewRowLimit || 200;
+  var totalPages = Math.max(1, Math.ceil(total / perPage));
+  if (state.comparePage > totalPages) state.comparePage = totalPages;
+  if (state.comparePage < 1) state.comparePage = 1;
+  pgBar.outerHTML = _renderPagination(total, perPage, state.comparePage, 'compare');
+  _bindPagination('cardCompare', 'compare', {
+    onPage: function(p) { state.comparePage = p; renderCompare(); },
+    onRowsPerPage: function(v) { state.previewRowLimit = v; state.previewPage = 1; state.comparePage = 1; renderPreview(); renderCompare(); }
+  });
 }
 
 // ── 增量更新单行（翻译进行中避免全量重建） ──
