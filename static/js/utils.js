@@ -79,7 +79,8 @@ function createLogger(containerId, maxLines) {
   function log(msg, cls) {
     var area = $(containerId);
     if (!area) return;
-    area.classList.add('visible');
+    area.style.display = 'flex';
+    area.style.flexDirection = 'column';
     var now = new Date();
     var ts = now.getHours().toString().padStart(2, '0') + ':' +
              now.getMinutes().toString().padStart(2, '0') + ':' +
@@ -95,7 +96,7 @@ function createLogger(containerId, maxLines) {
     var area = $(containerId);
     if (!area) return;
     area.innerHTML = '';
-    area.classList.remove('visible');
+    area.style.display = 'none';
   }
   return { log: log, clear: clear };
 }
