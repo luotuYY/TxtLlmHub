@@ -137,7 +137,7 @@ function _buildCompareRowHtml(l) {
     '<td class="col-actions">' +
       '<button class="btn btn-sm" data-action="keep-old" data-index="' + l.index + '" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
       '<button class="btn btn-sm" data-action="retry-one" data-index="' + l.index + '">重译</button>' +
-      '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=译文">复制</button>' +
+      '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=新译文">复制</button>' +
     '</td>' +
   '</tr>';
 }

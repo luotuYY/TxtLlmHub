@@ -429,10 +429,10 @@ function copyRow(index) {
   var t = l.new_translation && l.new_translation !== ' ' ? l.new_translation : (l.translation || '');
   var text = t ? l.original + '=' + t : l.original;
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function () { showToast('已复制'); });
+    navigator.clipboard.writeText(text).then(function () { showToast('已复制原文=新译文'); });
   } else {
     fallbackCopy(text);
-    showToast('已复制');
+    showToast('已复制原文=新译文');
   }
 }
 
