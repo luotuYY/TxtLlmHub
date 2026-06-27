@@ -1200,13 +1200,16 @@ async function tagStart() {
                 item.confidence = conf;
                 tagUpdateOneCard(item);
               }
+              tagLog('[' + (item.index != null ? item.index + 1 : '?') + '] → ' + (item.tag_l1 || raw.substring(0, 20)), 'ok');
             } else if (d.error) {
               errors++;
+              tagLog('[' + (item.index != null ? item.index + 1 : '?') + '] 错误: ' + d.error, 'err');
             }
             done++;
           } else {
             errors++;
             done++;
+            tagLog('[' + (item.index != null ? item.index + 1 : '?') + '] 请求失败', 'err');
           }
           var sc = done - errors;
           document.getElementById('tagProgressFill').style.width = (done/total*100)+'%';

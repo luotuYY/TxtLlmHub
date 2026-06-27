@@ -509,8 +509,8 @@ async function dedupStart() {
           }),
           signal: controller.signal,
         }).then(async function (res) {
-          activeControllers.delete(controller);
           try {
+            activeControllers.delete(controller);
             if (res.ok) {
               var text = await res.text();
               try {
@@ -529,21 +529,25 @@ async function dedupStart() {
               } catch (e) {
                 errors.val++;
               }
+              dedupLog('[组] ' + group.key.substring(0, 30) + ' → 最佳序号' + data.best_index, 'ok');
             } else {
               errors.val++;
+              dedupLog('[组] ' + group.key.substring(0, 30) + ' 请求失败', 'err');
             }
             completed.val++;
+            fill.style.width = (completed.val / allGroups.length * 100) + "%";
+            text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
+            launchNext();
           } catch (err) {
             if (err.name !== "AbortError") {
               errors.val++;
               completed.val++;
             }
+            fill.style.width = (completed.val / allGroups.length * 100) + "%";
+            text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
+            launchNext();
           }
-          fill.style.width = (completed.val / allGroups.length * 100) + "%";
-          text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
-          launchNext();
         }).catch(function (fetchErr) {
-          activeControllers.delete(controller);
           if (fetchErr.name !== "AbortError") {
             errors.val++;
             completed.val++;
@@ -572,6 +576,7 @@ async function dedupStart() {
     _dedupStopRuntime();
     $("dedupBtnStart").disabled = false;
     $("dedupBtnStop").disabled = true;
+    $("dedupBtnStop").textContent = "停止";
 };
 
 function dedupStop() {
