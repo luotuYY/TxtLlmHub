@@ -5,7 +5,7 @@
  */
 
 
-import { $, escHtml, showToast, log, clearLog, logChunk } from './utils.js';
+import { $, escHtml, showToast, log, clearLog } from './utils.js';
 import { state, rebuildIndicesAndCheckboxes, updateTranslateAllButton, updateManualBtn, updateRetryButton, getLLMParams, getApiConfig } from './state.js';
 import { renderPreview, renderCompare, updateSearchUI, updateCompareRow, updatePreviewLine, setBatchUpdating, updatePreviewSelectAllVisibility, updateSelectAllPreview } from './render.js';
 // ── 文件上传 ──
@@ -286,8 +286,6 @@ async function translateBatchItems(items) {
       }
 
       var chunk = chunks[chunkIdx];
-      logChunk(chunkIdx + 1, totalChunks, chunk.length, total, mode);
-
       var batchBody = Object.assign({ items: chunk, concurrency: concurrency }, params, apiConfig);
       var r = await fetch(apiUrl, {
         method: 'POST',

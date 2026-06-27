@@ -482,7 +482,6 @@ async function _streamOneChunk(groupsChunk, chunkIdx, chunkKeys, total, complete
     var reader = r.body.getReader();
     var decoder = new TextDecoder();
     var buffer = "";
-    dedupLog(">> 块 " + (chunkIdx+1) + " (" + groupsChunk.length + " 组)");
 
     while (true) {
       if (dedupState.abort) break;

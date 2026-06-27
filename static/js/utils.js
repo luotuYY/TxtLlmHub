@@ -72,12 +72,6 @@ function showToast(msg) {
   toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2500);
 }
 
-// ── Chunk Log Helper ──
-function logChunk(chunkNum, totalChunks, itemsInChunk, totalItems, mode) {
-  var label = mode === 'polish' ? '润色' : (mode === 'tag' ? '分词' : '翻译');
-  log('── 块 ' + chunkNum + '/' + totalChunks + ' ── ' + label + ' ' + itemsInChunk + ' 条（累计 ' + Math.min(chunkNum * itemsInChunk, totalItems) + '/' + totalItems + '）');
-}
-
 // ── Activity Log ──
 function log(msg, cls, prepend) {
   const logArea = $('logArea');
@@ -201,6 +195,6 @@ function showConfirm(msg) {
 })();
 
 // ── Module exports ──
-export { $, escHtml, escRegex, setHighlight, hl, matches, fallbackCopy, naturalCompare, showToast, logChunk, log, clearLog, showConfirm };
+export { $, escHtml, escRegex, setHighlight, hl, matches, fallbackCopy, naturalCompare, showToast, log, clearLog, showConfirm };
 
 // ── Window bindings (HTML onclick compat) ──
