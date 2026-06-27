@@ -409,7 +409,8 @@ var _dedupActiveControllers = null;
 function dedupAbortActiveRequests() {
   if (_dedupActiveControllers) {
     _dedupActiveControllers.forEach(function (ctrl) { ctrl.abort(); });
-    _dedupActiveControllers.clear();
+    // 不要 .clear() — 让各 .catch() 处理器自行 delete，
+    // 等全部完成后 activeControllers.size 自然归零再 resolve
     _dedupActiveControllers = null;
   }
 }
