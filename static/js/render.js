@@ -111,7 +111,38 @@ function updatePreviewLine(index) {
     '</span>';
 }
 
-// ── 对比表格 ──
+// ════════════════════════════════════════════════════════════════
+//  对比表 — 公共渲染函数
+// ════════════════════════════════════════════════════════════════
+
+// ── 构建「新译文」单元格 HTML ──
+function _buildNewCellHtml(l) {
+  if (l.error) return '\u26A0' + escHtml(l.error);
+  if (l.new_translation === ' ') return '<span class="cleared-mark">\u2014</span>';
+  var html = hl(l.new_translation);
+  if (l.truncated) html += ' <span title="响应被截断，翻译可能不完整" style="cursor:help">\u26A0\uFE0F</span>';
+  if (l.warning && !l.truncated) html += ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>';
+  if (l.degraded) html += ' <span title="无旧译文，已降级为直译" style="cursor:help;color:var(--text-muted)">↓</span>';
+  return html;
+}
+
+// ── 构建单行 HTML（tr 内容） ──
+function _buildCompareRowHtml(l) {
+  var rowCls = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
+  return '<tr class="' + rowCls + '" data-row-index="' + l.index + '">' +
+    '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" data-action="compare-check" ' + (state.compareChecked.has(l.index) ? 'checked' : '') + '></td>' +
+    '<td class="cell-copyable" data-action="copy-original" title="点击复制">' + hl(l.original) + '</td>' +
+    '<td>' + (l.translation ? hl(l.translation) : '\u2014') + '</td>' +
+    '<td class="cell-editable col-new" data-action="edit-translation" data-index="' + l.index + '" title="' + (l.warning || '点击编辑') + '">' + _buildNewCellHtml(l) + '</td>' +
+    '<td class="col-actions">' +
+      '<button class="btn btn-sm" data-action="keep-old" data-index="' + l.index + '" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
+      '<button class="btn btn-sm" data-action="retry-one" data-index="' + l.index + '">重译</button>' +
+      '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=译文">复制</button>' +
+    '</td>' +
+  '</tr>';
+}
+
+// ── 对比表排序 ──
 function toggleSort() {
   state.sortState = (state.sortState + 1) % 3;
   var labels = ['\u25BC', '\u25BCO', '\u25BCN'];
@@ -121,6 +152,7 @@ function toggleSort() {
   renderCompare();
 }
 
+// ── 对比表全量渲染 ──
 function renderCompare() {
   // 编辑进行中：跳过重建，标记为待刷新
   if (document.querySelector('.compare-table .inline-edit')) {
@@ -130,6 +162,7 @@ function renderCompare() {
   // 批量翻译进行中：禁止全量重建，由 updateCompareRow() 增量处理
   if (_batchUpdating) return;
   renderInternal.compareDirty = false;
+
   var q = state.compareQuery;
   setHighlight(q);
   var rows = state.lines.filter(function (l) { return l.new_translation || l.error; });
@@ -140,60 +173,191 @@ function renderCompare() {
     });
     shown = rows.length;
   }
+
+  // 空状态
   if (state.lines.every(function (l) { return !l.new_translation && !l.error; })) {
     $('cardCompare').innerHTML = '<div class="empty-state">翻译后将在此显示前后对比</div>';
-  } else if (q && shown === 0) {
+    return;
+  }
+  if (q && shown === 0) {
     $('cardCompare').innerHTML = '<div class="empty-state">无匹配结果</div>';
-  } else {
-    var curSort = state.sortState;
-    if (curSort === 1) {
-      rows.sort(function (a, b) { return naturalCompare(a.original, b.original); });
-    } else if (curSort === 2) {
-      rows.sort(function (a, b) { return naturalCompare(a.new_translation || '', b.new_translation || ''); });
-    }
-    var total = rows.length;
-    var perPage = state.previewRowLimit || 200;
-    var totalPages = Math.max(1, Math.ceil(total / perPage));
-    if (state.comparePage > totalPages) state.comparePage = totalPages;
-    if (state.comparePage < 1) state.comparePage = 1;
-    var start = (state.comparePage - 1) * perPage;
-    var pageRows = rows.slice(start, start + perPage);
-    var compareHtml = '<table class="compare-table"><thead><tr>' +
+    return;
+  }
+
+  // 排序
+  var curSort = state.sortState;
+  if (curSort === 1) rows.sort(function (a, b) { return naturalCompare(a.original, b.original); });
+  else if (curSort === 2) rows.sort(function (a, b) { return naturalCompare(a.new_translation || '', b.new_translation || ''); });
+
+  // 分页
+  var total = rows.length;
+  var perPage = state.previewRowLimit || 200;
+  var totalPages = Math.max(1, Math.ceil(total / perPage));
+  if (state.comparePage > totalPages) state.comparePage = totalPages;
+  if (state.comparePage < 1) state.comparePage = 1;
+  var start = (state.comparePage - 1) * perPage;
+  var pageRows = rows.slice(start, start + perPage);
+
+  // 渲染表格
+  var html = '<table class="compare-table"><thead><tr>' +
+    '<th class="col-check"><input type="checkbox" id="selectAllCompare" data-action="toggle-select-all-compare" title="全选/取消筛选结果"></th>' +
+    '<th class="col-orig">原文</th>' +
+    '<th class="col-old">旧译文</th>' +
+    '<th class="col-new">新译文 <button class="btn btn-sm" data-action="clear-new-without-old" title="清空所有无旧译文词条的新译文" style="font-size:0.68rem;padding:1px 6px">清</button></th>' +
+    '<th class="col-actions"></th>' +
+  '</tr></thead><tbody>';
+  pageRows.forEach(function (l) { html += _buildCompareRowHtml(l); });
+  html += '</tbody></table>';
+  html += _renderPagination(total, perPage, state.comparePage, 'compare');
+  $('cardCompare').innerHTML = html;
+  _bindComparePagination();
+  if (q) $('compareSearchCount').textContent = shown + ' 条匹配';
+  updateSelectAllCompare();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  对比表 — 增量更新（批量翻译专用）
+// ════════════════════════════════════════════════════════════════
+
+// ── 增量追加单行到对比表 ──
+function _appendCompareRow(l) {
+  var table = document.querySelector('.compare-table');
+  var tbody;
+  if (!table) {
+    // 表格不存在，创建骨架
+    $('cardCompare').innerHTML = '<table class="compare-table"><thead><tr>' +
       '<th class="col-check"><input type="checkbox" id="selectAllCompare" data-action="toggle-select-all-compare" title="全选/取消筛选结果"></th>' +
       '<th class="col-orig">原文</th>' +
       '<th class="col-old">旧译文</th>' +
       '<th class="col-new">新译文 <button class="btn btn-sm" data-action="clear-new-without-old" title="清空所有无旧译文词条的新译文" style="font-size:0.68rem;padding:1px 6px">清</button></th>' +
       '<th class="col-actions"></th>' +
-    '</tr></thead><tbody>';
-    pageRows.forEach(function (l) {
-      var rowCls = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
-      compareHtml += '<tr class="' + rowCls + '" data-row-index="' + l.index + '">' +
-        '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" data-action="compare-check" ' + (state.compareChecked.has(l.index) ? 'checked' : '') + '></td>' +
-        '<td class="cell-copyable" data-action="copy-original" title="点击复制">' + hl(l.original) + '</td>' +
-        '<td>' + (l.translation ? hl(l.translation) : '\u2014') + '</td>' +
-        '<td class="cell-editable col-new" data-action="edit-translation" data-index="' + l.index + '" title="' + (l.warning ? l.warning : '点击编辑') + '">' +
-          (l.error ? '\u26A0' + escHtml(l.error) : l.new_translation === ' ' ? '<span class="cleared-mark">\u2014</span>' : hl(l.new_translation)) +
-          (l.truncated ? ' <span title="响应被截断，翻译可能不完整" style="cursor:help">\u26A0\uFE0F</span>' : '') +
-          (l.warning && !l.truncated ? ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>' : '') +
-          (l.degraded ? ' <span title="无旧译文，已降级为直译" style="cursor:help;color:var(--text-muted)">↓</span>' : '') +
-        '</td>' +
-        '<td class="col-actions">' +
-          '<button class="btn btn-sm" data-action="keep-old" data-index="' + l.index + '" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
-          '<button class="btn btn-sm" data-action="retry-one" data-index="' + l.index + '">重译</button>' +
-          '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=译文">复制</button>' +
-        '</td>' +
-      '</tr>';
-    });
-    compareHtml += '</tbody></table>';
-    compareHtml += _renderPagination(total, perPage, state.comparePage, 'compare');
-    $('cardCompare').innerHTML = compareHtml;
-    _bindComparePagination();
+    '</tr></thead><tbody></tbody></table>';
+    tbody = document.querySelector('.compare-table tbody');
+  } else {
+    tbody = table.querySelector('tbody');
+    if (!tbody) { tbody = document.createElement('tbody'); table.appendChild(tbody); }
+    if (tbody.querySelector('tr[data-row-index="' + l.index + '"]')) return; // 已存在则跳过
   }
-  if (q) $('compareSearchCount').textContent = shown + ' 条匹配';
-  updateSelectAllCompare();
+  // 用 fragment 批量插入，减少回流
+  var tmp = document.createElement('tbody');
+  tmp.innerHTML = _buildCompareRowHtml(l);
+  tbody.appendChild(tmp.firstElementChild);
+  _refreshComparePagination();
 }
 
-// ── 预览复选框 ──
+// ── 增量更新单行（翻译进行中避免全量重建） ──
+function updateCompareRow(index) {
+  var l = state.lines[index];
+  if (!l) return;
+
+  // 批量更新期间或无搜索/排序时：增量更新
+  var row = document.querySelector('.compare-table tbody tr[data-row-index="' + index + '"]');
+  if (!row) {
+    // 行不存在 → 追加
+    _appendCompareRow(l);
+    return;
+  }
+  // 正在编辑则跳过
+  if (row.querySelector('.inline-edit')) return;
+
+  // 更新行样式
+  row.className = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
+
+  // 更新「新译文」单元格
+  var newCell = row.querySelector('.col-new');
+  if (newCell && !newCell.querySelector('.inline-edit')) {
+    newCell.innerHTML = _buildNewCellHtml(l);
+    newCell.className = 'cell-editable col-new';
+    newCell.title = l.warning || '点击编辑';
+  }
+
+  // 更新「保留译文」按钮状态（用 data-action 选择器，修复原 onclick 选择器失效 bug）
+  var keepBtn = row.querySelector('.col-actions button[data-action="keep-old"]');
+  if (keepBtn) {
+    keepBtn.disabled = !l.translation || l.keepOld;
+    keepBtn.title = !l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文';
+    keepBtn.textContent = l.keepOld ? '已保留' : '保留译文';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  对比表 — 分页
+// ════════════════════════════════════════════════════════════════
+
+// ── 轻量翻页（仅切换行可见性 + 更新分页条，不触发全量重建） ──
+function _comparePageTo(p) {
+  var container = document.getElementById('cardCompare');
+  if (!container) return;
+  var rows = container.querySelectorAll('.compare-table tbody tr[data-row-index]');
+  var perPage = state.previewRowLimit || 200;
+  var total = rows.length;
+  var totalPages = Math.max(1, Math.ceil(total / perPage));
+  if (p < 1) p = 1;
+  if (p > totalPages) p = totalPages;
+  state.comparePage = p;
+  var start = (p - 1) * perPage;
+  var end = p * perPage;
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].style.display = (i >= start && i < end) ? '' : 'none';
+  }
+  var pgBar = container.querySelector('.pagination-bar');
+  if (pgBar) pgBar.outerHTML = _renderPagination(total, perPage, p, 'compare');
+  _bindComparePagination();
+  container.scrollTop = 0;
+}
+
+// ── 绑定对比表分页事件（可重复调用） ──
+function _bindComparePagination() {
+  _bindPagination('cardCompare', 'compare', {
+    onPage: function(p) { _comparePageTo(p); },
+    onRowsPerPage: function(v) {
+      state.previewRowLimit = v;
+      state.previewPage = 1;
+      state.comparePage = 1;
+      renderPreview();
+      renderCompare();
+    }
+  });
+}
+
+// ── 刷新对比表分页（增量追加行时调用） ──
+function _refreshComparePagination() {
+  var container = document.getElementById('cardCompare');
+  if (!container) return;
+  var tbody = container.querySelector('.compare-table tbody');
+  if (!tbody) return;
+  var allRows = tbody.querySelectorAll('tr[data-row-index]');
+  var total = allRows.length;
+  var perPage = state.previewRowLimit || 200;
+
+  if (total <= perPage) {
+    for (var i = 0; i < allRows.length; i++) allRows[i].style.display = '';
+    var pgBar = container.querySelector('.pagination-bar');
+    if (pgBar) pgBar.remove();
+    return;
+  }
+
+  var totalPages = Math.ceil(total / perPage);
+  if (state.comparePage > totalPages) state.comparePage = totalPages;
+  var start = (state.comparePage - 1) * perPage;
+  var end = state.comparePage * perPage;
+  for (var i = 0; i < allRows.length; i++) {
+    allRows[i].style.display = (i >= start && i < end) ? '' : 'none';
+  }
+
+  var pgBar = container.querySelector('.pagination-bar');
+  if (pgBar) {
+    pgBar.outerHTML = _renderPagination(total, perPage, state.comparePage, 'compare');
+  } else {
+    container.insertAdjacentHTML('beforeend', _renderPagination(total, perPage, state.comparePage, 'compare'));
+  }
+  _bindComparePagination();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  预览 / 对比 — 复选框
+// ════════════════════════════════════════════════════════════════
+
 function updatePreviewSelectAllVisibility() {
   var master = document.getElementById('selectAllPreview');
   var btn = document.getElementById('btnTranslatePreviewSel');
@@ -219,7 +383,6 @@ function toggleSelectAllPreview() {
     if (master.checked) { state.previewChecked.add(idx); }
     else { state.previewChecked.delete(idx); }
   });
-  // 更新翻译选中按钮状态
   var btn = document.getElementById('btnTranslatePreviewSel');
   if (btn) btn.disabled = !master.checked || state.translating;
 }
@@ -235,7 +398,6 @@ function updateSelectAllPreview() {
   } else {
     visible = state.lines;
   }
-  // Only consider current page
   var perPage = state.previewRowLimit || 200;
   var totalPages = Math.max(1, Math.ceil(visible.length / perPage));
   if (state.previewPage > totalPages) state.previewPage = totalPages;
@@ -257,7 +419,6 @@ function getCheckedPreviewIndices() {
   return Array.from(state.previewChecked).sort(function (a, b) { return a - b; });
 }
 
-// ── 对比复选框 ──
 function onCompareCheck(cb) {
   var idx = parseInt(cb.dataset.index);
   if (cb.checked) { state.compareChecked.add(idx); }
@@ -295,7 +456,10 @@ function getCheckedRows() {
   return state.lines.filter(function (l) { return state.compareChecked.has(l.index); });
 }
 
-// ── 分页控件渲染 ──
+// ════════════════════════════════════════════════════════════════
+//  通用分页控件
+// ════════════════════════════════════════════════════════════════
+
 function _renderPagination(total, perPage, currentPage, pageKey) {
   if (total <= perPage) return '';
   var totalPages = Math.ceil(total / perPage);
@@ -305,9 +469,7 @@ function _renderPagination(total, perPage, currentPage, pageKey) {
   var html = '<div class="pagination-bar">';
   html += '<span class="pagination-info">' + start + '-' + end + ' / ' + total + ' 条</span>';
   html += '<div class="pagination-controls">';
-  // 上一页
   html += '<button data-pg="' + pageKey + '" data-page="' + (currentPage - 1) + '"' + (currentPage <= 1 ? ' disabled' : '') + '>&laquo;</button>';
-  // 页码
   var pages = _calcPageRange(currentPage, totalPages);
   pages.forEach(function (p) {
     if (p === '...') {
@@ -316,7 +478,6 @@ function _renderPagination(total, perPage, currentPage, pageKey) {
       html += '<button data-pg="' + pageKey + '" data-page="' + p + '"' + (p === currentPage ? ' class="pg-active"' : '') + '>' + p + '</button>';
     }
   });
-  // 下一页
   html += '<button data-pg="' + pageKey + '" data-page="' + (currentPage + 1) + '"' + (currentPage >= totalPages ? ' disabled' : '') + '>&raquo;</button>';
   html += '</div>';
   html += '<div class="pagination-rowsper">';
@@ -372,207 +533,9 @@ function onPreviewRowLimitChange() { renderPreview(); }
 function onPreviewCustomLimitChange() {}
 function initPreviewRowLimit() { state.previewRowLimit = 200; }
 
-// ── 增量追加单行到对比表（批量更新专用，不触发全量重建） ──
-function _appendCompareRow(l) {
-  var tbody;
-  var table = document.querySelector('.compare-table');
-  if (!table) {
-    // 表格不存在，创建骨架
-    $('cardCompare').innerHTML = '<table class="compare-table"><thead><tr>' +
-      '<th class="col-check"><input type="checkbox" id="selectAllCompare" data-action="toggle-select-all-compare" title="全选/取消筛选结果"></th>' +
-      '<th class="col-orig">原文</th>' +
-      '<th class="col-old">旧译文</th>' +
-      '<th class="col-new">新译文 <button class="btn btn-sm" data-action="clear-new-without-old" title="清空所有无旧译文词条的新译文" style="font-size:0.68rem;padding:1px 6px">清</button></th>' +
-      '<th class="col-actions"></th>' +
-    '</tr></thead><tbody></tbody></table>';
-    tbody = document.querySelector('.compare-table tbody');
-  } else {
-    tbody = table.querySelector('tbody');
-    if (!tbody) { tbody = document.createElement('tbody'); table.appendChild(tbody); }
-    // 已存在则跳过
-    if (tbody.querySelector('tr[data-row-index="' + l.index + '"]')) return;
-  }
-  var rowCls = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
-  var extra = '';
-  if (l.truncated) extra += ' <span title="响应被截断，翻译可能不完整" style="cursor:help">\u26A0\uFE0F</span>';
-  if (l.warning && !l.truncated) extra += ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>';
-  if (l.degraded) extra += ' <span title="无旧译文，已降级为直译" style="cursor:help;color:var(--text-muted)">↓</span>';
-  var newContent;
-  if (l.error) { newContent = '\u26A0 ' + escHtml(l.error); }
-  else if (l.new_translation === ' ') { newContent = '<span class="cleared-mark">\u2014</span>'; }
-  else { newContent = hl(l.new_translation) + extra; }
-  var tr = document.createElement('tr');
-  tr.className = rowCls;
-  tr.setAttribute('data-row-index', l.index);
-  tr.innerHTML =
-    '<td class="col-check"><input type="checkbox" class="row-check" data-index="' + l.index + '" data-action="compare-check"></td>' +
-    '<td class="cell-copyable" data-action="copy-original" title="点击复制">' + hl(l.original) + '</td>' +
-    '<td>' + (l.translation ? hl(l.translation) : '\u2014') + '</td>' +
-    '<td class="cell-editable col-new" data-action="edit-translation" data-index="' + l.index + '" title="' + (l.warning || '点击编辑') + '">' + newContent + '</td>' +
-    '<td class="col-actions">' +
-      '<button class="btn btn-sm" data-action="keep-old" data-index="' + l.index + '" ' + (l.keepOld || !l.translation ? 'disabled' : '') + ' title="' + (!l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文') + '">' + (l.keepOld ? '已保留' : '保留译文') + '</button>' +
-      '<button class="btn btn-sm" data-action="retry-one" data-index="' + l.index + '">重译</button>' +
-      '<button class="btn btn-sm" data-action="copy-row" data-index="' + l.index + '" title="复制原文=译文">复制</button>' +
-    '</td>';
-  tbody.appendChild(tr);
-  _refreshComparePagination();
-}
-
-// ── 对比表轻量翻页（不触发 renderCompare 全量重建） ──
-function _comparePageTo(p) {
-  var container = document.getElementById('cardCompare');
-  if (!container) return;
-  var rows = container.querySelectorAll('.compare-table tbody tr[data-row-index]');
-  var perPage = state.previewRowLimit || 200;
-  var total = rows.length;
-  var totalPages = Math.max(1, Math.ceil(total / perPage));
-  if (p < 1) p = 1;
-  if (p > totalPages) p = totalPages;
-  state.comparePage = p;
-  var start = (p - 1) * perPage;
-  var end = p * perPage;
-  for (var i = 0; i < rows.length; i++) {
-    rows[i].style.display = (i >= start && i < end) ? '' : 'none';
-  }
-  // 更新分页条
-  var pgBar = container.querySelector('.pagination-bar');
-  if (pgBar) pgBar.outerHTML = _renderPagination(total, perPage, p, 'compare');
-  _bindComparePagination();
-  container.scrollTop = 0;
-}
-
-// ── 绑定对比表分页事件（可重复调用） ──
-function _bindComparePagination() {
-  _bindPagination('cardCompare', 'compare', {
-    onPage: function(p) { _comparePageTo(p); },
-    onRowsPerPage: function(v) {
-      state.previewRowLimit = v;
-      state.previewPage = 1;
-      state.comparePage = 1;
-      renderPreview();
-      renderCompare();
-    }
-  });
-}
-
-// ── 刷新对比表分页（增量追加行时调用，自动分页 + 跳转末页） ──
-function _refreshComparePagination() {
-  var container = document.getElementById('cardCompare');
-  if (!container) return;
-  var tbody = container.querySelector('.compare-table tbody');
-  if (!tbody) return;
-  var allRows = tbody.querySelectorAll('tr[data-row-index]');
-  var total = allRows.length;
-  var perPage = state.previewRowLimit || 200;
-
-  if (total <= perPage) {
-    // 未超限：显示所有行，移除分页条
-    for (var i = 0; i < allRows.length; i++) allRows[i].style.display = '';
-    var pgBar = container.querySelector('.pagination-bar');
-    if (pgBar) pgBar.remove();
-    return;
-  }
-
-  // 超过分页界限：保持当前页，更新分页条
-  var totalPages = Math.ceil(total / perPage);
-  if (state.comparePage > totalPages) state.comparePage = totalPages;
-  var start = (state.comparePage - 1) * perPage;
-  var end = state.comparePage * perPage;
-  for (var i = 0; i < allRows.length; i++) {
-    allRows[i].style.display = (i >= start && i < end) ? '' : 'none';
-  }
-
-  // 更新分页条
-  var pgBar = container.querySelector('.pagination-bar');
-  if (pgBar) {
-    pgBar.outerHTML = _renderPagination(total, perPage, state.comparePage, 'compare');
-  } else {
-    container.insertAdjacentHTML('beforeend', _renderPagination(total, perPage, state.comparePage, 'compare'));
-  }
-  _bindComparePagination();
-}
-
-// ── 增量更新单行（翻译进行中避免全量重建） ──
-function updateCompareRow(index) {
-  var l = state.lines[index];
-  if (!l) return;
-  // 批量更新期间：行存在则增量更新，不存在则追加单行
-  if (_batchUpdating) {
-    var row = document.querySelector('.compare-table tbody tr[data-row-index="' + index + '"]');
-    if (!row) { _appendCompareRow(l); return; }
-    if (row.querySelector('.inline-edit')) return;
-    row.className = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
-    var newCell = row.querySelector('.col-new');
-    if (newCell && !newCell.querySelector('.inline-edit')) {
-      if (l.error) {
-        newCell.innerHTML = '\u26A0 ' + escHtml(l.error);
-      } else if (l.new_translation === ' ') {
-        newCell.innerHTML = '<span class="cleared-mark">\u2014</span>';
-      } else {
-        var extra = '';
-        if (l.truncated) extra += ' <span title="响应被截断，翻译可能不完整" style="cursor:help">\u26A0\uFE0F</span>';
-        if (l.warning && !l.truncated) extra += ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>';
-        if (l.degraded) extra += ' <span title="无旧译文，已降级为直译" style="cursor:help;color:var(--text-muted)">↓</span>';
-        newCell.innerHTML = hl(l.new_translation) + extra;
-      }
-      newCell.className = 'cell-editable col-new';
-      newCell.title = l.warning || '点击编辑';
-    }
-    var keepBtn = row.querySelector('.col-actions button[onclick^="keepOld"]');
-    if (keepBtn) {
-      keepBtn.disabled = !l.translation || l.keepOld;
-      keepBtn.title = !l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文';
-      keepBtn.textContent = l.keepOld ? '已保留' : '保留译文';
-    }
-    return;
-  }
-  // 如果有搜索或排序激活，增量更新无意义，走全量
-  if (state.compareQuery || state.sortState !== 0) {
-    renderCompare();
-    return;
-  }
-  var row = document.querySelector('.compare-table tbody tr[data-row-index="' + index + '"]');
-  if (!row) {
-    // 行不存在（首次出现翻译结果），整体刷新一次
-    renderCompare();
-    return;
-  }
-  // 更新行样式
-  row.className = (l.error ? 'row-error' : '') + (l.keepOld ? ' row-keep' : '');
-  // 更新"新译文"列（跳过正在编辑的单元格）
-  var newCell = row.querySelector('.col-new');
-  if (newCell) {
-    // 如果单元格内有正在编辑的 textarea，跳过更新
-    if (newCell.querySelector('.inline-edit')) return;
-    if (l.error) {
-      newCell.innerHTML = '\u26A0 ' + escHtml(l.error);
-    } else if (l.new_translation === ' ') {
-      newCell.innerHTML = '<span class="cleared-mark">\u2014</span>';
-    } else {
-      var extra = '';
-      if (l.truncated) extra += ' <span title="响应被截断，翻译可能不完整" style="cursor:help">\u26A0\uFE0F</span>';
-      if (l.warning && !l.truncated) extra += ' <span title="' + escHtml(l.warning) + '" style="cursor:help;color:var(--yellow)">\u26A0\uFE0F</span>';
-      if (l.degraded) extra += ' <span title="无旧译文，已降级为直译" style="cursor:help;color:var(--text-muted)">↓</span>';
-      newCell.innerHTML = hl(l.new_translation) + extra;
-    }
-    // 恢复可编辑属性
-    newCell.className = 'cell-editable col-new';
-    newCell.title = l.warning || '点击编辑';
-  }
-  // 更新"保留译文"按钮状态
-  var keepBtn = row.querySelector('.col-actions button[onclick^="keepOld"]');
-  if (keepBtn) {
-    keepBtn.disabled = !l.translation || l.keepOld;
-    keepBtn.title = !l.translation ? '无原译文可保留' : l.keepOld ? '已标记保留' : '用旧译文替换新译文';
-    keepBtn.textContent = l.keepOld ? '已保留' : '保留译文';
-  }
-}
-
 // ── 批量翻译开始/结束标记（用于增量更新判断） ──
 var _batchUpdating = false;
 function setBatchUpdating(v) { _batchUpdating = v; }
 
 // ── Module exports ──
 export { renderInternal, getCheckedFileNames, updateSearchUI, renderPreview, updatePreviewLine, toggleSort, renderCompare, updatePreviewSelectAllVisibility, onPreviewCheck, toggleSelectAllPreview, updateSelectAllPreview, getCheckedPreviewIndices, onCompareCheck, toggleSelectAllCompare, updateSelectAllCompare, getCheckedRows, onPreviewRowLimitChange, onPreviewCustomLimitChange, initPreviewRowLimit, updateCompareRow, _appendCompareRow, setBatchUpdating, _renderPagination, _bindPagination };
-
-// ── Window bindings (HTML onclick compat) ──
