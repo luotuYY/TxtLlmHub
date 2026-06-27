@@ -510,14 +510,9 @@ async function _streamOneChunk(groupsChunk, chunkIdx, chunkKeys, total, complete
               dedupState.bestIndices.set(key, data.best_index);
               var visibleIdx = dedupState.visibleKeys.indexOf(key);
               _updateGroupDOM(key, visibleIdx);
-              var snip = key.length > 48 ? key.substring(0, 45) + "..." : key;
-              dedupLog("OK " + snip + " → 第" + (data.best_index+1) + "条", "ok");
             }
           } else if (data.error) {
             errors.val++;
-            var eKey = chunkKeys[data.group_index];
-            var eDisp = eKey ? (eKey.length > 48 ? eKey.substring(0, 45) + "..." : eKey) : "[" + ((offset || 0) + data.group_index + 1) + "]";
-            dedupLog("FAIL " + eDisp + ": " + data.error, "err");
           }
 
           var fill = $("dedupProgressFill");

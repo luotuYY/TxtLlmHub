@@ -1181,7 +1181,6 @@ async function tagStart() {
                 var item = chunk[pos];
                 if (res.error) {
                   errors++;
-                  tagLog('[' + (done+1) + '] ✗ "' + item.original.substring(0,20) + '" → ' + res.error, 'err');
                 } else if (!item._manualEdit) {
                   // Normalize tag_l1: match against schema (case-insensitive, trim)
                   var l1 = (res.tag_l1 || '').trim();
@@ -1212,7 +1211,6 @@ async function tagStart() {
                   item.tag_l2 = l2;
                   item.confidence = res.confidence || 0;
                   tagUpdateOneCard(item);
-                  tagLog('[' + (done+1) + '] ✓ "' + item.original.substring(0,20) + '" → ' + l1 + '/' + l2, 'ok');
                 }
                 done++;
               }
