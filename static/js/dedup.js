@@ -509,49 +509,35 @@ async function dedupStart() {
           }),
           signal: controller.signal,
         }).then(async function (res) {
-          try {
-            activeControllers.delete(controller);
-            if (res.ok) {
-              var text = await res.text();
-              try {
-                var data = JSON.parse(text.trim());
-                if (data.best_index !== undefined && data.best_index !== null) {
-                  var grp = dedupState.groups[group.key];
-                  grp.forEach(function (e, idx) {
-                    dedupState.selected.set(_entryId(e), idx === data.best_index);
-                  });
-                  dedupState.bestIndices.set(group.key, data.best_index);
-                  var visibleIdx = dedupState.visibleKeys.indexOf(group.key);
-                  _updateGroupDOM(group.key, visibleIdx);
-                } else if (data.error) {
-                  errors.val++;
-                }
-              } catch (e) {
-                errors.val++;
-              }
-              dedupLog('[组] ' + group.key.substring(0, 30) + ' → 最佳序号' + data.best_index, 'ok');
+          activeControllers.delete(controller);
+          if (res.ok) {
+            var rawText = await res.text();
+            var data = JSON.parse(rawText.trim());
+            if (data.best_index !== undefined && data.best_index !== null) {
+              var grp = dedupState.groups[group.key];
+              grp.forEach(function (e, idx) {
+                dedupState.selected.set(_entryId(e), idx === data.best_index);
+              });
+              dedupState.bestIndices.set(group.key, data.best_index);
+              var visibleIdx = dedupState.visibleKeys.indexOf(group.key);
+              _updateGroupDOM(group.key, visibleIdx);
             } else {
               errors.val++;
-              dedupLog('[组] ' + group.key.substring(0, 30) + ' 请求失败', 'err');
             }
-            completed.val++;
-            fill.style.width = (completed.val / allGroups.length * 100) + "%";
-            text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
-            launchNext();
-          } catch (err) {
-            if (err.name !== "AbortError") {
-              errors.val++;
-              completed.val++;
-            }
-            fill.style.width = (completed.val / allGroups.length * 100) + "%";
-            text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
-            launchNext();
-          }
-        }).catch(function (fetchErr) {
-          if (fetchErr.name !== "AbortError") {
+            dedupLog('[组] ' + group.key.substring(0, 30) + ' → 最佳序号' + data.best_index, 'ok');
+          } else {
             errors.val++;
-            completed.val++;
+            dedupLog('[组] ' + group.key.substring(0, 30) + ' 请求失败', 'err');
           }
+        }).catch(function (err) {
+          activeControllers.delete(controller);
+          if (err.name !== "AbortError") {
+            errors.val++;
+            dedupLog('[组] ' + group.key.substring(0, 30) + ' 异常: ' + err.message, 'err');
+          }
+        }).then(function () {
+          // finally — 无论成功失败都只执行一次
+          completed.val++;
           fill.style.width = (completed.val / allGroups.length * 100) + "%";
           text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
           launchNext();
