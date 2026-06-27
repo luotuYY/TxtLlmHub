@@ -510,23 +510,21 @@ async function dedupStart() {
             ...apiConfig,
           }),
           signal: controller.signal,
-        })
-          .then(async function (res) {
-            activeControllers.delete(controller);
+        }).then(async function (res) {
+          activeControllers.delete(controller);
+          try {
             if (res.ok) {
               var text = await res.text();
               try {
                 var data = JSON.parse(text.trim());
-                completed.val++;
                 if (data.best_index !== undefined && data.best_index !== null) {
-                  var key = group.key;
-                  var grp = dedupState.groups[key];
+                  var grp = dedupState.groups[group.key];
                   grp.forEach(function (e, idx) {
                     dedupState.selected.set(_entryId(e), idx === data.best_index);
                   });
-                  dedupState.bestIndices.set(key, data.best_index);
-                  var visibleIdx = dedupState.visibleKeys.indexOf(key);
-                  _updateGroupDOM(key, visibleIdx);
+                  dedupState.bestIndices.set(group.key, data.best_index);
+                  var visibleIdx = dedupState.visibleKeys.indexOf(group.key);
+                  _updateGroupDOM(group.key, visibleIdx);
                 } else if (data.error) {
                   errors.val++;
                 }
@@ -535,23 +533,27 @@ async function dedupStart() {
               }
             } else {
               errors.val++;
-              completed.val++;
             }
-
-            fill.style.width = (completed.val / allGroups.length * 100) + "%";
-            text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
-            launchNext();
-          })
-          .catch(function (err) {
-            activeControllers.delete(controller);
+            completed.val++;
+          } catch (err) {
             if (err.name !== "AbortError") {
               errors.val++;
               completed.val++;
             }
-            fill.style.width = (completed.val / allGroups.length * 100) + "%";
-            text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
-            launchNext();
-          });
+          }
+          fill.style.width = (completed.val / allGroups.length * 100) + "%";
+          text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
+          launchNext();
+        }).catch(function (fetchErr) {
+          activeControllers.delete(controller);
+          if (fetchErr.name !== "AbortError") {
+            errors.val++;
+            completed.val++;
+          }
+          fill.style.width = (completed.val / allGroups.length * 100) + "%";
+          text.textContent = "评估进度: " + completed.val + "/" + allGroups.length;
+          launchNext();
+        });
       }
 
       for (var i = 0; i < Math.min(concurrency, allGroups.length); i++) {
